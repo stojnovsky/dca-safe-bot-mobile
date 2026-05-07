@@ -1,0 +1,45 @@
+{
+  "name": "dca-safe-bot-mobile",
+  "version": "1.0.0",
+  "main": "./index.js",
+  "scripts": {
+    "start": "expo start",
+    "ios-install-pod": "cd ios && pod install && cd ..",
+    "ios": "expo run:ios",
+    "ios-device": "expo run:ios --device",
+    "build": "eas build --platform ios"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/drawer": "^7.3.9",
+    "expo": "~55.0.23",
+    "expo-background-fetch": "~55.0.15",
+    "expo-background-task": "^55.0.17",
+    "expo-build-properties": "~55.0.13",
+    "expo-crypto": "~55.0.14",
+    "expo-linking": "~55.0.15",
+    "expo-router": "~55.0.14",
+    "expo-secure-store": "~55.0.13",
+    "expo-sqlite": "~55.0.15",
+    "expo-status-bar": "~55.0.6",
+    "expo-task-manager": "~55.0.15",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-gesture-handler": "~2.30.0",
+    "react-native-get-random-values": "^1.11.0",
+    "react-native-reanimated": "4.2.1",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0",
+    "react-native-svg": "15.15.3",
+    "react-native-worklets": "0.7.4",
+    "viem": "^2.48.8"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "^19.2.14",
+    "typescript": "^5.3.0"
+  },
+  "overrides": {
+    "expo-task-manager": "~55.0.15"
+  }
+}

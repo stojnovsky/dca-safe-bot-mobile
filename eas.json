@@ -1,0 +1,10 @@
+{
+  "build": {
+    "production": {
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      }
+    }
+  }
+}

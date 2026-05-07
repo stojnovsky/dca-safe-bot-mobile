@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Medit",
+    "slug": "dca-safe-bot",
+    "version": "1.0.0",
+    "scheme": "dcabot",
+    "platforms": [
+      "ios"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.dcasafebot.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fetch"
+        ]
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.0"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b00c3b1d-608a-466e-8db3-4d40505d29a1"
+      }
+    }
+  }
+}
