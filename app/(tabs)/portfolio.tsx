@@ -9,9 +9,13 @@ import { getConfig, getPrivateKey } from '@/lib/config-store';
 import { getPublicClient } from '@/lib/safe';
 import { getAllPositions, getAllUsdcPositions } from '@/lib/position-store';
 import { runDailyDca } from '@/lib/dca-runner';
+import { logBotRun, logBotEvent } from '@/lib/log-store';
+import { getPricesForRange } from '@/lib/price-store';
+import { buildPositionTimeline } from '@/lib/timeline';
 import { CONTRACTS, ERC20_ABI, PRICE_API_URL } from '@/lib/constants';
 import type { BotConfig } from '@/lib/types';
 import StatCard from '@/components/StatCard';
+import PortfolioChart, { type ChartPoint } from '@/components/PortfolioChart';
 
 function fmt(n: number, d = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -49,6 +53,7 @@ export default function PortfolioScreen() {
   const [loading,    setLoading]    = useState(false);
   const [running,    setRunning]    = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  const [timeline,   setTimeline]   = useState<ChartPoint[]>([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -61,9 +66,27 @@ export default function PortfolioScreen() {
       setConfig(cfg);
       setPositions(pos);
 
+      let liveData: LiveData | null = null;
       if (cfg.safeAddress) {
-        const liveData = await readBalance(cfg.safeAddress as `0x${string}`, cfg.rpcUrl);
+        liveData = await readBalance(cfg.safeAddress as `0x${string}`, cfg.rpcUrl);
         setLive(liveData);
+      }
+
+      if (pos.length > 0) {
+        const start = [...pos].sort((a, b) => a.buyDate.localeCompare(b.buyDate))[0].buyDate;
+        const today = new Date().toISOString().slice(0, 10);
+        const [eth, btc] = await Promise.all([
+          getPricesForRange('ethereum', start, today),
+          getPricesForRange('bitcoin',  start, today),
+        ]);
+        setTimeline(
+          buildPositionTimeline(pos, eth, btc, {
+            liveEthPrice: liveData?.ethPrice,
+            liveBtcPrice: liveData?.btcPrice,
+          }),
+        );
+      } else {
+        setTimeline([]);
       }
     } catch (e) {
       Alert.alert('Error', String(e));
@@ -87,9 +110,12 @@ export default function PortfolioScreen() {
       const msg = `${result.buys.length} buys, ${result.sells.length} sells` +
         (result.errors.length ? `\nErrors: ${result.errors.join('; ')}` : '');
       setLastResult(msg);
+      await logBotRun('manual', result);
       refresh();
     } catch (e) {
-      setLastResult(`Error: ${e}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      setLastResult(`Error: ${msg}`);
+      await logBotEvent('manual', 'error', msg, { stack: e instanceof Error ? e.stack : undefined });
     } finally {
       setRunning(false);
     }
@@ -162,6 +188,12 @@ export default function PortfolioScreen() {
       {lastResult && (
         <View style={[styles.resultBox, lastResult.startsWith('Error') && styles.resultBoxError]}>
           <Text style={styles.resultTxt}>{lastResult}</Text>
+        </View>
+      )}
+
+      {timeline.length > 1 && (
+        <View style={styles.chartWrapper}>
+          <PortfolioChart data={timeline} height={260} />
         </View>
       )}
 
@@ -245,4 +277,5 @@ const styles = StyleSheet.create({
   statusTxt:    { fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' },
   txLink:       { paddingLeft: 10 },
   txTxt:        { color: '#3b82f6', fontSize: 16 },
+  chartWrapper: { marginBottom: 12 },
 });

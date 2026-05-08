@@ -40,6 +40,20 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
       sell_price           REAL NOT NULL,
       usdc_amount          REAL NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS bot_runs (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL,
+      source    TEXT NOT NULL,
+      status    TEXT NOT NULL,
+      buys      INTEGER NOT NULL DEFAULT 0,
+      sells     INTEGER NOT NULL DEFAULT 0,
+      errors    INTEGER NOT NULL DEFAULT 0,
+      message   TEXT,
+      details   TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_bot_runs_ts ON bot_runs(timestamp DESC);
   `);
   return _db;
 }

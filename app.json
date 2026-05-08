@@ -4,6 +4,7 @@
     "slug": "dca-safe-bot",
     "version": "1.0.0",
     "scheme": "dcabot",
+    "icon": "./assets/icon.png",
     "platforms": [
       "ios"
     ],
@@ -12,17 +13,20 @@
       "supportsTablet": false,
       "infoPlist": {
         "UIBackgroundModes": [
-          "fetch"
+          "fetch",
+          "processing"
         ]
       }
     },
     "plugins": [
       "expo-router",
+      "expo-background-task",
       [
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "16.0"
+            "deploymentTarget": "16.0",
+            "buildReactNativeFromSource": true
           }
         }
       ]

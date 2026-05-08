@@ -7,7 +7,14 @@ import { useFocusEffect } from 'expo-router';
 import { getConfig, saveConfig, getPrivateKey, savePrivateKey, getCoinGeckoKey, saveCoinGeckoKey } from '@/lib/config-store';
 import { getPublicClient } from '@/lib/safe';
 import { SAFE_ABI, DEFAULT_RPC } from '@/lib/constants';
-import { unregisterDcaTask, registerDcaTask } from '@/tasks/dca-task';
+import {
+  unregisterDcaTask,
+  registerDcaTask,
+  isDcaTaskRegistered,
+  getBackgroundTaskStatus,
+  runDcaTaskNow,
+} from '@/tasks/dca-task';
+import * as BackgroundTask from 'expo-background-task';
 import type { BotConfig } from '@/lib/types';
 
 function Field({ label, sub, value, onChangeText, secureTextEntry, placeholder, mono }: {
@@ -39,18 +46,23 @@ export default function SettingsScreen() {
   const [config,  setConfig]  = useState<BotConfig>({ safeAddress: '', rpcUrl: DEFAULT_RPC, dailyAmountEth: 5, dailyAmountBtc: 5, profitThreshold: 5 });
   const [pk,      setPk]      = useState('');
   const [cgKey,   setCgKey]   = useState('');
-  const [botOn,   setBotOn]   = useState(true);
+  const [botOn,   setBotOn]   = useState(false);
+  const [bgStatus, setBgStatus] = useState<BackgroundTask.BackgroundTaskStatus | null>(null);
+  const [triggering, setTriggering] = useState(false);
   const [saved,   setSaved]   = useState(false);
   const [safeInfo, setSafeInfo] = useState<{ owners: string[]; threshold: number } | null>(null);
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [cfg, storedPk, storedCg] = await Promise.all([
+      const [cfg, storedPk, storedCg, registered, status] = await Promise.all([
         getConfig(), getPrivateKey(), getCoinGeckoKey(),
+        isDcaTaskRegistered(), getBackgroundTaskStatus(),
       ]);
       setConfig(cfg);
       if (storedPk) setPk(storedPk);
       if (storedCg) setCgKey(storedCg);
+      setBotOn(registered);
+      setBgStatus(status);
     })();
   }, []));
 
@@ -85,9 +97,62 @@ export default function SettingsScreen() {
 
   const toggleBot = async (on: boolean) => {
     setBotOn(on);
-    if (on) await registerDcaTask();
-    else    await unregisterDcaTask();
+    try {
+      if (on) await registerDcaTask();
+      else    await unregisterDcaTask();
+      const [registered, status] = await Promise.all([
+        isDcaTaskRegistered(), getBackgroundTaskStatus(),
+      ]);
+      setBotOn(registered);
+      setBgStatus(status);
+    } catch (e) {
+      Alert.alert('Background task error', String(e));
+      setBotOn(!on);
+    }
   };
+
+  const runNow = async () => {
+    setTriggering(true);
+    try {
+      const [registered, status] = await Promise.all([
+        isDcaTaskRegistered(), getBackgroundTaskStatus(),
+      ]);
+      setBotOn(registered);
+      setBgStatus(status);
+
+      if (!registered) {
+        Alert.alert(
+          'Bot not registered',
+          'Toggle "Hourly background check" ON above first, then try again.',
+        );
+        return;
+      }
+      if (status === BackgroundTask.BackgroundTaskStatus.Restricted) {
+        Alert.alert(
+          'Background tasks restricted',
+          'iOS reports background tasks are restricted. This happens on the iOS Simulator (BGTaskScheduler is unavailable there) or when "Background App Refresh" is disabled in iOS Settings. Test on a real device.',
+        );
+        return;
+      }
+
+      const ok = await runDcaTaskNow();
+      Alert.alert(
+        ok ? 'Task triggered' : 'Trigger failed',
+        ok
+          ? 'Check the Logs tab for the result.'
+          : 'triggerTaskWorkerForTestingAsync only works in debug builds. Run via `npx expo run:ios` instead of a release/EAS build.',
+      );
+    } catch (e) {
+      Alert.alert('Trigger error', String(e));
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  const bgStatusLabel =
+    bgStatus === BackgroundTask.BackgroundTaskStatus.Available  ? 'Available'  :
+    bgStatus === BackgroundTask.BackgroundTaskStatus.Restricted ? 'Restricted (Background App Refresh disabled)' :
+    bgStatus === null                                           ? '…'          : 'Unknown';
 
   const set = (key: keyof BotConfig) => (v: string) => {
     const numeric = ['dailyAmountEth', 'dailyAmountBtc', 'profitThreshold'];
@@ -146,12 +211,40 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Background Bot</Text>
         <View style={styles.toggleRow}>
-          <View>
+          <View style={{ flex: 1, marginRight: 12 }}>
             <Text style={styles.toggleLabel}>Hourly background check</Text>
-            <Text style={styles.toggleSub}>iOS runs at ~1 hour intervals (battery dependent)</Text>
+            <Text style={styles.toggleSub}>
+              iOS schedules at its own discretion (typically every few hours, requires charging + idle).
+            </Text>
           </View>
           <Switch value={botOn} onValueChange={toggleBot} thumbColor="#3b82f6" trackColor={{ true: '#1e3a8a', false: '#374151' }} />
         </View>
+
+        <View style={styles.statusRow}>
+          <Text style={styles.statusLabel}>Registered</Text>
+          <Text style={[styles.statusVal, { color: botOn ? '#10b981' : '#6b7280' }]}>
+            {botOn ? 'Yes' : 'No'}
+          </Text>
+        </View>
+        <View style={styles.statusRow}>
+          <Text style={styles.statusLabel}>iOS status</Text>
+          <Text style={[
+            styles.statusVal,
+            { color: bgStatus === BackgroundTask.BackgroundTaskStatus.Available ? '#10b981' : '#f87171' },
+          ]}>
+            {bgStatusLabel}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.secondaryBtn, { marginTop: 10 }]}
+          onPress={runNow}
+          disabled={triggering}
+        >
+          <Text style={styles.secondaryBtnTxt}>
+            {triggering ? 'Triggering…' : 'Run Background Task Now (debug)'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Save */}
@@ -181,7 +274,10 @@ const styles = StyleSheet.create({
   ownerTxt:      { color: '#6b7280', fontSize: 10, fontVariant: ['tabular-nums'] },
   toggleRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   toggleLabel:   { color: '#d1d5db', fontSize: 14, fontWeight: '500' },
-  toggleSub:     { color: '#6b7280', fontSize: 11, marginTop: 2, maxWidth: 260 },
+  toggleSub:     { color: '#6b7280', fontSize: 11, marginTop: 2 },
+  statusRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4, marginTop: 8 },
+  statusLabel:   { color: '#9ca3af', fontSize: 11 },
+  statusVal:     { fontSize: 11, fontWeight: '600' },
   saveBtn:       { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   saveBtnSaved:  { backgroundColor: '#065f46' },
   saveBtnTxt:    { color: '#fff', fontWeight: '700', fontSize: 15 },

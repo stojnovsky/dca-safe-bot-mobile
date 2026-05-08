@@ -8,7 +8,7 @@ import { runSimulation } from '@/lib/dca-engine';
 import { getPricesForRange, seedAllPrices, getPriceCoverage } from '@/lib/price-store';
 import { HISTORY_START } from '@/lib/constants';
 import type { SimulationResult, BacktestConfig } from '@/lib/types';
-import LineChart from '@/components/LineChart';
+import PortfolioChart, { type ChartPoint } from '@/components/PortfolioChart';
 import StatCard from '@/components/StatCard';
 
 const PERIODS = [
@@ -196,8 +196,15 @@ export default function SimulationScreen() {
 
           {result && result.days.length > 0 && (
             <View style={styles.chartWrapper}>
-              <Text style={styles.sectionLabel}>Portfolio Value</Text>
-              <LineChart days={result.days} height={180} />
+              <PortfolioChart
+                data={result.days.map<ChartPoint>((d) => ({
+                  date:           d.date,
+                  invested:       d.totalInvested,
+                  portfolioValue: d.totalValue,
+                  pnlPercent:     d.pnlPercent,
+                }))}
+                height={260}
+              />
             </View>
           )}
         </>
