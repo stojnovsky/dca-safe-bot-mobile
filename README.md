@@ -210,6 +210,7 @@ Tap **Verify Safe on-chain** to confirm the app can read your Safe's owners and 
 
 ## Security notes
 
+- **Disclaimer:** This product was **vibe coded** (AI-assisted, iterative development). It is offered **without warranty** of any kind and **as-is**. Do not deploy capital you cannot afford to lose; audit and test yourself before mainnet use.
 - The **bot key is a Safe co-owner**, not the only owner. Use a multi-owner / threshold setup so a compromised iPhone can't drain your funds.
 - The bot key is written to `expo-secure-store`, which on iOS maps to the **Keychain** (Secure Enclave-backed when available). It is never logged, exported, or sent off-device.
 - Free Apple ID provisioning expires every **7 days** — see the sideloading guide for refresh strategies.
