@@ -1,6 +1,6 @@
 import { formatUnits } from 'viem';
 import { getPublicClient } from './safe';
-import { swapUsdcForAsset, swapAssetForUsdc } from './swap';
+import { swapUsdcForAsset, swapUsdcForEthAndBtcPair, swapAssetForUsdc } from './swap';
 import {
   createPosition, closePosition,
   createUsdcPosition, getOpenPositions, hasPositionForDate,
@@ -84,30 +84,67 @@ export async function runDailyDca(config: BotConfig, privateKey: `0x${string}`):
     return result;
   }
 
-  for (const asset of ['ETH', 'BTC'] as const) {
-    const amount = asset === 'ETH' ? config.dailyAmountEth : config.dailyAmountBtc;
-    const price  = asset === 'ETH' ? ethPrice : btcPrice;
+  const needEth = !(await hasPositionForDate('ETH', today));
+  const needBtc = !(await hasPositionForDate('BTC', today));
 
-    if (await hasPositionForDate(asset, today)) {
-      result.errors.push(`Already bought ${asset} today, skipping`);
-      continue;
-    }
+  if (!needEth) result.errors.push('Already bought ETH today, skipping');
+  if (!needBtc) result.errors.push('Already bought BTC today, skipping');
 
+  // Both legs in one Safe MultiSend + one signer tx — sequential Safe txs often caused the 2nd leg to fail (nonce / RPC timing).
+  if (needEth && needBtc) {
     try {
-      const { txHash, assetAmount } = await swapUsdcForAsset(
-        amount, asset, safeAddress, privateKey, config.rpcUrl,
+      const { txHash, ethAssetAmount, btcAssetAmount } = await swapUsdcForEthAndBtcPair(
+        config.dailyAmountEth,
+        config.dailyAmountBtc,
+        safeAddress,
+        privateKey,
+        config.rpcUrl,
       );
       await createPosition({
-        asset,
+        asset:        'ETH',
         buyDate:      today,
-        buyPrice:     price,
-        usdcInvested: amount,
-        assetAmount,
+        buyPrice:     ethPrice,
+        usdcInvested: config.dailyAmountEth,
+        assetAmount:  ethAssetAmount,
         buyTxHash:    txHash,
       });
-      result.buys.push({ asset, txHash, assetAmount, price });
+      await createPosition({
+        asset:        'BTC',
+        buyDate:      today,
+        buyPrice:     btcPrice,
+        usdcInvested: config.dailyAmountBtc,
+        assetAmount:  btcAssetAmount,
+        buyTxHash:    txHash,
+      });
+      result.buys.push({ asset: 'ETH', txHash, assetAmount: ethAssetAmount, price: ethPrice });
+      result.buys.push({ asset: 'BTC', txHash, assetAmount: btcAssetAmount, price: btcPrice });
     } catch (e) {
-      result.errors.push(`buy ${asset}: ${e}`);
+      result.errors.push(`buy ETH+BTC: ${e}`);
+    }
+  } else {
+    for (const asset of ['ETH', 'BTC'] as const) {
+      const want = asset === 'ETH' ? needEth : needBtc;
+      if (!want) continue;
+
+      const amount = asset === 'ETH' ? config.dailyAmountEth : config.dailyAmountBtc;
+      const price  = asset === 'ETH' ? ethPrice : btcPrice;
+
+      try {
+        const { txHash, assetAmount } = await swapUsdcForAsset(
+          amount, asset, safeAddress, privateKey, config.rpcUrl,
+        );
+        await createPosition({
+          asset,
+          buyDate:      today,
+          buyPrice:     price,
+          usdcInvested: amount,
+          assetAmount,
+          buyTxHash:    txHash,
+        });
+        result.buys.push({ asset, txHash, assetAmount, price });
+      } catch (e) {
+        result.errors.push(`buy ${asset}: ${e}`);
+      }
     }
   }
 
