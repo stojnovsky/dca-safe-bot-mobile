@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { useEffect, useState } from 'react';
 import type { BotConfig } from './types';
 import { DEFAULT_RPC, DEFAULT_PRICES_API_URL } from './constants';
 
@@ -28,7 +29,35 @@ const DEFAULT_CONFIG: BotConfig = {
   dailyAmountEth:  5,
   dailyAmountBtc:  5,
   profitThreshold: 5,
+  showLogsTab:     false,
+  gamifyPositions: true,
 };
+
+// ── Reactive subscription so the tabbar (or any other screen) can re-render
+//    when settings change without polling.
+type ConfigListener = (cfg: BotConfig) => void;
+const listeners = new Set<ConfigListener>();
+
+export function subscribeConfig(listener: ConfigListener): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+
+/**
+ * React hook returning the latest BotConfig with automatic re-render on every
+ * `saveConfig`. Returns `null` until the first load resolves so callers can
+ * distinguish "loading" from "defaults".
+ */
+export function useConfig(): BotConfig | null {
+  const [cfg, setCfg] = useState<BotConfig | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getConfig().then((c) => { if (alive) setCfg(c); });
+    const unsub = subscribeConfig((c) => setCfg(c));
+    return () => { alive = false; unsub(); };
+  }, []);
+  return cfg;
+}
 
 export async function getConfig(): Promise<BotConfig> {
   try {
@@ -42,7 +71,9 @@ export async function getConfig(): Promise<BotConfig> {
 
 export async function saveConfig(config: Partial<BotConfig>): Promise<void> {
   const current = await getConfig();
-  await AsyncStorage.setItem(CONFIG_KEY, JSON.stringify({ ...current, ...config }));
+  const merged  = { ...current, ...config };
+  await AsyncStorage.setItem(CONFIG_KEY, JSON.stringify(merged));
+  listeners.forEach((l) => { try { l(merged); } catch { /* ignore listener errors */ } });
 }
 
 export async function getPrivateKey(): Promise<string | null> {

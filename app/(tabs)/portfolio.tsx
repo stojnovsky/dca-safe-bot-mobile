@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { formatUnits } from 'viem';
-import { getConfig, getPrivateKey } from '@/lib/config-store';
+import { getConfig, getPrivateKey, useConfig } from '@/lib/config-store';
 import { getPublicClient } from '@/lib/safe';
 import { getAllPositions, getAllUsdcPositions } from '@/lib/position-store';
 import { runDailyDca } from '@/lib/dca-runner';
@@ -13,9 +13,10 @@ import { logBotRun, logBotEvent } from '@/lib/log-store';
 import { getPricesForRange } from '@/lib/price-store';
 import { buildPositionTimeline } from '@/lib/timeline';
 import { CONTRACTS, ERC20_ABI, PRICE_API_URL } from '@/lib/constants';
-import type { BotConfig } from '@/lib/types';
+import type { BotConfig, CryptoPosition } from '@/lib/types';
 import StatCard from '@/components/StatCard';
 import PortfolioChart, { type ChartPoint } from '@/components/PortfolioChart';
+import CoinVault from '@/components/CoinVault';
 
 function fmt(n: number, d = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -46,7 +47,45 @@ async function readBalance(safeAddress: `0x${string}`, rpcUrl: string): Promise<
   };
 }
 
+/**
+ * The Portfolio screen stores positions via `position-store.Position`, which is
+ * structurally similar to (but distinct from) `CryptoPosition` from the
+ * simulation engine. To feed `CoinVault` we need to project Position[] into
+ * CryptoPosition[] and inject the live-price-derived fields the vault expects.
+ */
+function enrichForVault(
+  p: Awaited<ReturnType<typeof getAllPositions>>[number],
+  ethPrice: number,
+  btcPrice: number,
+): CryptoPosition {
+  const isOpen = p.status === 'OPEN';
+  const price  = p.asset === 'ETH' ? ethPrice : btcPrice;
+  const finalValue       = isOpen ? p.assetAmount * price                          : undefined;
+  const unrealizedPnlUsd = isOpen && finalValue !== undefined ? finalValue - p.usdcInvested : undefined;
+  const unrealizedPnlPct = isOpen && price > 0 ? ((price - p.buyPrice) / p.buyPrice) * 100 : undefined;
+  return {
+    id:               p.id,
+    asset:            p.asset,
+    buyDate:          p.buyDate,
+    buyPrice:         p.buyPrice,
+    usdcInvested:     p.usdcInvested,
+    assetAmount:      p.assetAmount,
+    status:           p.status,
+    sellDate:         p.sellDate,
+    sellPrice:        p.sellPrice,
+    usdcReceived:     p.usdcReceived,
+    profitUsd:        p.profitUsd,
+    profitPct:        p.profitPct,
+    finalPrice:       isOpen ? price : undefined,
+    finalValue,
+    unrealizedPnlUsd,
+    unrealizedPnlPct,
+  };
+}
+
 export default function PortfolioScreen() {
+  const prefs = useConfig();
+  const gamify = prefs?.gamifyPositions !== false;
   const [live,       setLive]       = useState<LiveData | null>(null);
   const [positions,  setPositions]  = useState<Awaited<ReturnType<typeof getAllPositions>>>([]);
   const [config,     setConfig]     = useState<BotConfig | null>(null);
@@ -228,49 +267,55 @@ export default function PortfolioScreen() {
         </View>
       )}
 
-      {/* Positions table */}
-      <View style={styles.card}>
-        <Text style={styles.sectionLabel}>Positions ({positions.length})</Text>
-        {positions.length === 0 && (
+      {/* Positions: either gamified Daily Coins or a plain table */}
+      {positions.length === 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionLabel}>Positions (0)</Text>
           <Text style={styles.empty}>No positions yet. Run the bot to start.</Text>
-        )}
-        {positions.map((p) => {
-          const price    = p.asset === 'ETH' ? ethPrice : btcPrice;
-          const currVal  = p.status === 'OPEN' ? p.assetAmount * price : (p.usdcReceived ?? 0);
-          const pnlPct   = p.status === 'OPEN'
-            ? ((price - p.buyPrice) / p.buyPrice) * 100
-            : (p.profitPct ?? 0);
-          const pnlPos   = pnlPct >= 0;
+        </View>
+      ) : gamify ? (
+        <CoinVault positions={positions.map((p) => enrichForVault(p, ethPrice, btcPrice))} />
+      ) : (
+        <View style={styles.card}>
+          <Text style={styles.sectionLabel}>Positions ({positions.length})</Text>
+          {positions.map((p) => {
+            const price    = p.asset === 'ETH' ? ethPrice : btcPrice;
+            const currVal  = p.status === 'OPEN' ? p.assetAmount * price : (p.usdcReceived ?? 0);
+            const pnlPct   = p.status === 'OPEN'
+              ? ((price - p.buyPrice) / p.buyPrice) * 100
+              : (p.profitPct ?? 0);
+            const pnlPos   = pnlPct >= 0;
 
-          return (
-            <View key={p.id} style={styles.posRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.posAsset}>
-                  <Text style={p.asset === 'ETH' ? styles.eth : styles.btc}>{p.asset}</Text>
-                  {'  '}<Text style={styles.posDate}>{p.buyDate}</Text>
-                </Text>
-                <Text style={styles.posMeta}>
-                  ${fmt(p.usdcInvested)} → ${fmt(currVal)} · buy ${fmt(p.buyPrice, 0)}
-                </Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[styles.posPnl, { color: pnlPos ? '#34d399' : '#f87171' }]}>
-                  {pnlPos ? '+' : ''}{fmt(pnlPct)}%
-                </Text>
-                <View style={[styles.statusBadge, p.status === 'OPEN' && styles.statusOpen]}>
-                  <Text style={styles.statusTxt}>{p.status}</Text>
+            return (
+              <View key={p.id} style={styles.posRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.posAsset}>
+                    <Text style={p.asset === 'ETH' ? styles.eth : styles.btc}>{p.asset}</Text>
+                    {'  '}<Text style={styles.posDate}>{p.buyDate}</Text>
+                  </Text>
+                  <Text style={styles.posMeta}>
+                    ${fmt(p.usdcInvested)} → ${fmt(currVal)} · buy ${fmt(p.buyPrice, 0)}
+                  </Text>
                 </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[styles.posPnl, { color: pnlPos ? '#34d399' : '#f87171' }]}>
+                    {pnlPos ? '+' : ''}{fmt(pnlPct)}%
+                  </Text>
+                  <View style={[styles.statusBadge, p.status === 'OPEN' && styles.statusOpen]}>
+                    <Text style={styles.statusTxt}>{p.status}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`https://basescan.org/tx/${p.buyTxHash}`)}
+                  style={styles.txLink}
+                >
+                  <Text style={styles.txTxt}>↗</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() => Linking.openURL(`https://basescan.org/tx/${p.buyTxHash}`)}
-                style={styles.txLink}
-              >
-                <Text style={styles.txTxt}>↗</Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
+      )}
     </ScrollView>
   );
 }

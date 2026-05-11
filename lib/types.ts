@@ -84,4 +84,8 @@ export interface BotConfig extends BacktestConfig {
   safeAddress: string;
   rpcUrl: string;
   pricesApiUrl: string;
+  /** Show the developer-oriented "Logs" tab in the bottom tabbar. Off by default. */
+  showLogsTab?: boolean;
+  /** Render positions as gamified "Daily Coins" instead of a plain table. On by default. */
+  gamifyPositions?: boolean;
 }

@@ -251,6 +251,47 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Display preferences */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Display</Text>
+
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Gamify positions</Text>
+            <Text style={styles.toggleSub}>
+              Show positions as Daily Coins (gold = closed in profit, bronze = closed in loss, live = open). Turn off for a plain table.
+            </Text>
+          </View>
+          <Switch
+            value={config.gamifyPositions !== false}
+            onValueChange={async (v) => {
+              setConfig((c) => ({ ...c, gamifyPositions: v }));
+              try { await saveConfig({ gamifyPositions: v }); } catch { /* will be caught by Save */ }
+            }}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
+        </View>
+
+        <View style={[styles.toggleRow, { marginTop: 14 }]}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Show Logs tab</Text>
+            <Text style={styles.toggleSub}>
+              Developer-oriented log of every bot run (manual + background). Off by default.
+            </Text>
+          </View>
+          <Switch
+            value={!!config.showLogsTab}
+            onValueChange={async (v) => {
+              setConfig((c) => ({ ...c, showLogsTab: v }));
+              try { await saveConfig({ showLogsTab: v }); } catch { /* will be caught by Save */ }
+            }}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
+        </View>
+      </View>
+
       {/* Save */}
       <TouchableOpacity style={[styles.saveBtn, saved && styles.saveBtnSaved]} onPress={save}>
         <Text style={styles.saveBtnTxt}>{saved ? '✓ Saved' : 'Save Settings'}</Text>

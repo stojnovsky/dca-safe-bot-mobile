@@ -6,10 +6,12 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { runSimulation } from '@/lib/dca-engine';
 import { getPricesForRange, seedAllPrices, getPriceCoverage } from '@/lib/price-store';
+import { useConfig } from '@/lib/config-store';
 import { HISTORY_START } from '@/lib/constants';
-import type { SimulationResult, BacktestConfig } from '@/lib/types';
+import type { SimulationResult, BacktestConfig, CryptoPosition } from '@/lib/types';
 import PortfolioChart, { type ChartPoint } from '@/components/PortfolioChart';
 import StatCard from '@/components/StatCard';
+import CoinVault from '@/components/CoinVault';
 
 const PERIODS = [
   { label: '90d',  days: 90   },
@@ -27,6 +29,8 @@ function fmt(n: number, d = 2): string {
 export default function SimulationScreen() {
   const [config, setConfig]   = useState<BacktestConfig>({ dailyAmountEth: 5, dailyAmountBtc: 5, profitThreshold: 5 });
   const [period, setPeriod]   = useState(365);
+  const prefs = useConfig();
+  const gamify = prefs?.gamifyPositions !== false;
   const [result, setResult]   = useState<SimulationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
@@ -209,45 +213,9 @@ export default function SimulationScreen() {
           )}
 
           {result && result.cryptoPositions.length > 0 && (
-            <View style={styles.card}>
-              <View style={styles.posHeader}>
-                <Text style={styles.sectionLabel}>Positions ({result.cryptoPositions.length})</Text>
-                <Text style={styles.posSubLabel}>
-                  {s?.openPositions ?? 0} open · {s?.closedPositions ?? 0} closed
-                </Text>
-              </View>
-              {[...result.cryptoPositions]
-                .sort((a, b) => b.buyDate.localeCompare(a.buyDate))
-                .map((p) => {
-                  const isOpen  = p.status === 'OPEN';
-                  const currVal = isOpen ? (p.finalValue ?? 0) : (p.usdcReceived ?? 0);
-                  const pnlPct  = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
-                  const pnlPos  = pnlPct >= 0;
-                  const refPrice = isOpen ? (p.finalPrice ?? p.buyPrice) : (p.sellPrice ?? p.buyPrice);
-                  return (
-                    <View key={p.id} style={styles.posRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.posAsset}>
-                          <Text style={p.asset === 'ETH' ? styles.eth : styles.btc}>{p.asset}</Text>
-                          {'  '}<Text style={styles.posDate}>{p.buyDate}</Text>
-                          {p.sellDate && <Text style={styles.posDate}>{' → '}{p.sellDate}</Text>}
-                        </Text>
-                        <Text style={styles.posMeta}>
-                          ${fmt(p.usdcInvested)} → ${fmt(currVal)} · {isOpen ? 'now' : 'sell'} ${fmt(refPrice, 0)} (buy ${fmt(p.buyPrice, 0)})
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={[styles.posPnl, { color: pnlPos ? '#34d399' : '#f87171' }]}>
-                          {pnlPos ? '+' : ''}{fmt(pnlPct)}%
-                        </Text>
-                        <View style={[styles.statusBadge, isOpen && styles.statusOpen]}>
-                          <Text style={styles.statusTxt}>{p.status}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })}
-            </View>
+            gamify
+              ? <CoinVault positions={result.cryptoPositions} />
+              : <PositionsTable positions={result.cryptoPositions} openCount={s?.openPositions ?? 0} closedCount={s?.closedPositions ?? 0} />
           )}
         </>
       )}
@@ -256,6 +224,58 @@ export default function SimulationScreen() {
         <ActivityIndicator color="#3b82f6" style={styles.spinner} />
       )}
     </ScrollView>
+  );
+}
+
+// ── Plain table view of positions, used when gamification is OFF ─────────────
+
+function PositionsTable({
+  positions, openCount, closedCount,
+}: {
+  positions:   CryptoPosition[];
+  openCount:   number;
+  closedCount: number;
+}) {
+  const sorted = React.useMemo(
+    () => [...positions].sort((a, b) => b.buyDate.localeCompare(a.buyDate)),
+    [positions],
+  );
+  return (
+    <View style={styles.tableCard}>
+      <View style={styles.tableHead}>
+        <Text style={styles.sectionLabel}>Positions ({positions.length})</Text>
+        <Text style={styles.tableSub}>{openCount} open · {closedCount} closed</Text>
+      </View>
+      {sorted.map((p) => {
+        const isOpen   = p.status === 'OPEN';
+        const currVal  = isOpen ? (p.finalValue ?? 0) : (p.usdcReceived ?? 0);
+        const pnlPct   = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
+        const refPrice = isOpen ? (p.finalPrice ?? p.buyPrice) : (p.sellPrice ?? p.buyPrice);
+        const pnlPos   = pnlPct >= 0;
+        return (
+          <View key={p.id} style={styles.tableRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tableAsset}>
+                <Text style={p.asset === 'ETH' ? styles.eth : styles.btc}>{p.asset}</Text>
+                {'  '}<Text style={styles.tableDate}>{p.buyDate}</Text>
+                {p.sellDate && <Text style={styles.tableDate}>{' → '}{p.sellDate}</Text>}
+              </Text>
+              <Text style={styles.tableMeta}>
+                ${fmt(p.usdcInvested)} → ${fmt(currVal)} · {isOpen ? 'now' : 'sell'} ${fmt(refPrice, 0)} (buy ${fmt(p.buyPrice, 0)})
+              </Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={[styles.tablePnl, { color: pnlPos ? '#34d399' : '#f87171' }]}>
+                {pnlPos ? '+' : ''}{fmt(pnlPct)}%
+              </Text>
+              <View style={[styles.tableBadge, isOpen && styles.tableBadgeOpen]}>
+                <Text style={styles.tableBadgeTxt}>{p.status}</Text>
+              </View>
+            </View>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -288,16 +308,18 @@ const styles = StyleSheet.create({
   gridGap:     { width: 8 },
   chartWrapper:{ marginBottom: 16 },
   spinner:     { marginTop: 40 },
-  posHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
-  posSubLabel: { fontSize: 11, color: '#6b7280' },
-  posRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#1f2937' },
-  posAsset:    { fontSize: 13, fontWeight: '600', color: '#fff' },
-  posDate:     { fontSize: 11, color: '#6b7280', fontWeight: '400' },
-  posMeta:     { fontSize: 11, color: '#6b7280', marginTop: 2 },
-  posPnl:      { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
+
+  tableCard:   { backgroundColor: '#111827', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#1f2937', marginBottom: 12 },
+  tableHead:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
+  tableSub:    { fontSize: 11, color: '#6b7280' },
+  tableRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#1f2937' },
+  tableAsset:  { fontSize: 13, fontWeight: '600', color: '#fff' },
+  tableDate:   { fontSize: 11, color: '#6b7280', fontWeight: '400' },
+  tableMeta:   { fontSize: 11, color: '#6b7280', marginTop: 2 },
+  tablePnl:    { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  tableBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#1f2937', marginTop: 4 },
+  tableBadgeOpen: { backgroundColor: '#1e3a8a' },
+  tableBadgeTxt: { fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' },
   eth:         { color: '#60a5fa' },
   btc:         { color: '#fb923c' },
-  statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#1f2937', marginTop: 4 },
-  statusOpen:  { backgroundColor: '#1e3a8a' },
-  statusTxt:   { fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' },
 });
