@@ -8,12 +8,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   await _db.execAsync(`
     PRAGMA journal_mode = WAL;
 
-    CREATE TABLE IF NOT EXISTS price_cache (
-      asset TEXT NOT NULL,
-      date  TEXT NOT NULL,
-      price REAL NOT NULL,
-      PRIMARY KEY (asset, date)
-    );
+    DROP TABLE IF EXISTS price_cache;
 
     CREATE TABLE IF NOT EXISTS positions (
       id            TEXT PRIMARY KEY,

@@ -4,10 +4,16 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { registerDcaTask } from '@/tasks/dca-task';
+import { migrateKeychainAccessibility } from '@/lib/config-store';
 
 export default function RootLayout() {
   useEffect(() => {
-    registerDcaTask().catch(console.error);
+    // App launches in the foreground = device unlocked. Use this window to
+    // upgrade the private key's Keychain accessibility so the BG task can
+    // read it later while the screen is off.
+    migrateKeychainAccessibility()
+      .then(() => registerDcaTask())
+      .catch(console.error);
   }, []);
 
   return (

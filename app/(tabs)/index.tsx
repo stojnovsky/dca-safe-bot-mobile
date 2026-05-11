@@ -143,7 +143,7 @@ export default function SimulationScreen() {
       </View>
 
       {/* Price sync */}
-      <View style={styles.syncRow}>
+      {/* <View style={styles.syncRow}>
         <Text style={styles.coverageText}>
           {coverage?.from
             ? `Prices: ${coverage.from} · ${coverage.count} days`
@@ -161,7 +161,7 @@ export default function SimulationScreen() {
               </Text>
           }
         </TouchableOpacity>
-      </View>
+      </View> */}
 
       {/* Summary cards */}
       {s && (

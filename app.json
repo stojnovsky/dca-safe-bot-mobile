@@ -15,7 +15,16 @@
         "UIBackgroundModes": [
           "fetch",
           "processing"
-        ]
+        ],
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "prices.skyscraper.pro": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true,
+              "NSExceptionMinimumTLSVersion": "TLSv1.0"
+            }
+          }
+        }
       }
     },
     "plugins": [

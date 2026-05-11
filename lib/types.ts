@@ -83,4 +83,5 @@ export interface BacktestConfig {
 export interface BotConfig extends BacktestConfig {
   safeAddress: string;
   rpcUrl: string;
+  pricesApiUrl: string;
 }

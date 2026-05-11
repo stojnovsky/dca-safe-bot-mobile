@@ -4,9 +4,9 @@ import {
   StyleSheet, Alert, Switch,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { getConfig, saveConfig, getPrivateKey, savePrivateKey, getCoinGeckoKey, saveCoinGeckoKey } from '@/lib/config-store';
+import { getConfig, saveConfig, getPrivateKey, savePrivateKey } from '@/lib/config-store';
 import { getPublicClient } from '@/lib/safe';
-import { SAFE_ABI, DEFAULT_RPC } from '@/lib/constants';
+import { SAFE_ABI, DEFAULT_RPC, DEFAULT_PRICES_API_URL } from '@/lib/constants';
 import {
   unregisterDcaTask,
   registerDcaTask,
@@ -43,9 +43,8 @@ function Field({ label, sub, value, onChangeText, secureTextEntry, placeholder, 
 }
 
 export default function SettingsScreen() {
-  const [config,  setConfig]  = useState<BotConfig>({ safeAddress: '', rpcUrl: DEFAULT_RPC, dailyAmountEth: 5, dailyAmountBtc: 5, profitThreshold: 5 });
+  const [config,  setConfig]  = useState<BotConfig>({ safeAddress: '', rpcUrl: DEFAULT_RPC, pricesApiUrl: DEFAULT_PRICES_API_URL, dailyAmountEth: 5, dailyAmountBtc: 5, profitThreshold: 5 });
   const [pk,      setPk]      = useState('');
-  const [cgKey,   setCgKey]   = useState('');
   const [botOn,   setBotOn]   = useState(false);
   const [bgStatus, setBgStatus] = useState<BackgroundTask.BackgroundTaskStatus | null>(null);
   const [triggering, setTriggering] = useState(false);
@@ -54,13 +53,12 @@ export default function SettingsScreen() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [cfg, storedPk, storedCg, registered, status] = await Promise.all([
-        getConfig(), getPrivateKey(), getCoinGeckoKey(),
+      const [cfg, storedPk, registered, status] = await Promise.all([
+        getConfig(), getPrivateKey(),
         isDcaTaskRegistered(), getBackgroundTaskStatus(),
       ]);
       setConfig(cfg);
       if (storedPk) setPk(storedPk);
-      if (storedCg) setCgKey(storedCg);
       setBotOn(registered);
       setBgStatus(status);
     })();
@@ -70,7 +68,6 @@ export default function SettingsScreen() {
     try {
       await saveConfig(config);
       if (pk) await savePrivateKey(pk);
-      if (cgKey) await saveCoinGeckoKey(cgKey);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -201,10 +198,17 @@ export default function SettingsScreen() {
         <Field label="Sell at profit %" placeholder="5" value={String(config.profitThreshold)} onChangeText={set('profitThreshold')} />
       </View>
 
-      {/* CoinGecko */}
+      {/* Prices API */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>CoinGecko (Simulation)</Text>
-        <Field label="Pro API Key" sub="Stored in iOS Keychain" placeholder="CG-…" value={cgKey} onChangeText={setCgKey} secureTextEntry />
+        <Text style={styles.sectionTitle}>Prices API (Historical)</Text>
+        <Field
+          label="Base URL"
+          sub="medit/prices-api backend serving BTC/ETH historical prices"
+          placeholder={DEFAULT_PRICES_API_URL}
+          value={config.pricesApiUrl}
+          onChangeText={set('pricesApiUrl')}
+          mono
+        />
       </View>
 
       {/* Background bot toggle */}

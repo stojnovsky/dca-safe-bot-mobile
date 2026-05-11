@@ -4,11 +4,18 @@ import * as TaskManager from 'expo-task-manager';
 export const DCA_TASK_NAME = 'dca-hourly-check';
 
 export async function registerDcaTask(): Promise<void> {
-  const isRegistered = await TaskManager.isTaskRegisteredAsync(DCA_TASK_NAME);
-  if (isRegistered) return;
+  // Always re-register so changes to options (e.g. minimumInterval) take
+  // effect. iOS holds the *previous* BGProcessingTaskRequest with its
+  // earliestBeginDate; calling register again submits a fresh request.
+  if (await TaskManager.isTaskRegisteredAsync(DCA_TASK_NAME)) {
+    await BackgroundTask.unregisterTaskAsync(DCA_TASK_NAME);
+  }
 
   await BackgroundTask.registerTaskAsync(DCA_TASK_NAME, {
-    minimumInterval: 60 * 60, // hint only — iOS decides when to actually run
+    // expo-background-task expects MINUTES (not seconds). 15 is iOS's hard
+    // minimum; smaller values are clamped. iOS treats this as a lower bound
+    // and batches/defers based on battery, network and usage patterns.
+    minimumInterval: 60,
   });
 }
 
