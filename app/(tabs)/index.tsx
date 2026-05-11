@@ -207,6 +207,48 @@ export default function SimulationScreen() {
               />
             </View>
           )}
+
+          {result && result.cryptoPositions.length > 0 && (
+            <View style={styles.card}>
+              <View style={styles.posHeader}>
+                <Text style={styles.sectionLabel}>Positions ({result.cryptoPositions.length})</Text>
+                <Text style={styles.posSubLabel}>
+                  {s?.openPositions ?? 0} open · {s?.closedPositions ?? 0} closed
+                </Text>
+              </View>
+              {[...result.cryptoPositions]
+                .sort((a, b) => b.buyDate.localeCompare(a.buyDate))
+                .map((p) => {
+                  const isOpen  = p.status === 'OPEN';
+                  const currVal = isOpen ? (p.finalValue ?? 0) : (p.usdcReceived ?? 0);
+                  const pnlPct  = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
+                  const pnlPos  = pnlPct >= 0;
+                  const refPrice = isOpen ? (p.finalPrice ?? p.buyPrice) : (p.sellPrice ?? p.buyPrice);
+                  return (
+                    <View key={p.id} style={styles.posRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.posAsset}>
+                          <Text style={p.asset === 'ETH' ? styles.eth : styles.btc}>{p.asset}</Text>
+                          {'  '}<Text style={styles.posDate}>{p.buyDate}</Text>
+                          {p.sellDate && <Text style={styles.posDate}>{' → '}{p.sellDate}</Text>}
+                        </Text>
+                        <Text style={styles.posMeta}>
+                          ${fmt(p.usdcInvested)} → ${fmt(currVal)} · {isOpen ? 'now' : 'sell'} ${fmt(refPrice, 0)} (buy ${fmt(p.buyPrice, 0)})
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.posPnl, { color: pnlPos ? '#34d399' : '#f87171' }]}>
+                          {pnlPos ? '+' : ''}{fmt(pnlPct)}%
+                        </Text>
+                        <View style={[styles.statusBadge, isOpen && styles.statusOpen]}>
+                          <Text style={styles.statusTxt}>{p.status}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+            </View>
+          )}
         </>
       )}
 
@@ -246,4 +288,16 @@ const styles = StyleSheet.create({
   gridGap:     { width: 8 },
   chartWrapper:{ marginBottom: 16 },
   spinner:     { marginTop: 40 },
+  posHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
+  posSubLabel: { fontSize: 11, color: '#6b7280' },
+  posRow:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#1f2937' },
+  posAsset:    { fontSize: 13, fontWeight: '600', color: '#fff' },
+  posDate:     { fontSize: 11, color: '#6b7280', fontWeight: '400' },
+  posMeta:     { fontSize: 11, color: '#6b7280', marginTop: 2 },
+  posPnl:      { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  eth:         { color: '#60a5fa' },
+  btc:         { color: '#fb923c' },
+  statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#1f2937', marginTop: 4 },
+  statusOpen:  { backgroundColor: '#1e3a8a' },
+  statusTxt:   { fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' },
 });
