@@ -3,9 +3,10 @@ import * as SecureStore from 'expo-secure-store';
 import type { BotConfig } from './types';
 import { DEFAULT_RPC, DEFAULT_PRICES_API_URL } from './constants';
 
-const CONFIG_KEY        = 'bot_config';
-const PK_KEY            = 'bot_private_key';
-const PK_MIGRATED_FLAG  = 'pk_acl_migrated_v1';
+const CONFIG_KEY            = 'bot_config';
+const PK_KEY                = 'bot_private_key';
+const PK_MIGRATED_FLAG      = 'pk_acl_migrated_v1';
+const ONBOARDING_DRAFT_KEY  = 'onboarding_draft_v1';
 
 // iOS Keychain accessibility class for the bot's private key.
 //
@@ -79,4 +80,35 @@ export async function migrateKeychainAccessibility(): Promise<void> {
 
 export async function getPricesApiUrl(): Promise<string> {
   return (await getConfig()).pricesApiUrl || DEFAULT_PRICES_API_URL;
+}
+
+/**
+ * Persistence for an in-progress onboarding session. The wizard generates the
+ * signer key and a CREATE2 salt up-front, then asks the user to fund both
+ * the signer (ETH) and the *predicted* Safe address (USDC). If the user
+ * closes the app between funding and deployment, we MUST be able to resume
+ * with the same key / nonce — otherwise the USDC they already sent becomes
+ * unreachable.
+ */
+export interface OnboardingDraft {
+  saltNonce:    string;  // bigint serialized as decimal string
+  safeAddress:  string;  // predicted CREATE2 address
+  signerAddress:string;
+}
+
+export async function saveOnboardingDraft(d: OnboardingDraft): Promise<void> {
+  await AsyncStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify(d));
+}
+
+export async function getOnboardingDraft(): Promise<OnboardingDraft | null> {
+  try {
+    const raw = await AsyncStorage.getItem(ONBOARDING_DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as OnboardingDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearOnboardingDraft(): Promise<void> {
+  await AsyncStorage.removeItem(ONBOARDING_DRAFT_KEY);
 }

@@ -10,6 +10,15 @@ export const DEFAULT_RPC   = 'https://invictus.ambire.com/base';
 // Safe canonical MultiSend v1.3.0 on Base
 export const MULTISEND_ADDRESS: Address = '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526';
 
+// Safe v1.3.0 deployment infrastructure (canonical addresses, same on every EVM chain)
+export const SAFE_PROXY_FACTORY:    Address = '0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2';
+export const SAFE_L2_SINGLETON:     Address = '0x3E5c63644E683549055b9Be8653de26E0B4CD36E';
+export const SAFE_FALLBACK_HANDLER: Address = '0xf48f2B2d2a534e402487b3ee7C18c33Aec0Fe5e4';
+
+// Minimum balances we ask the user to fund during onboarding
+export const ONBOARDING_MIN_ETH_WEI = 1_000_000_000_000_000n; // 0.001 ETH (~$3) — covers Safe deploy + many DCA signings on Base
+export const ONBOARDING_MIN_USDC    = 10_000_000n;            // 10 USDC (6-decimals) — 1 day of default $5 ETH + $5 BTC DCA
+
 export const CONTRACTS = {
   USDC:        '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as Address,
   WETH:        '0x4200000000000000000000000000000000000006' as Address,
@@ -124,5 +133,53 @@ export const ERC20_TRANSFER_ABI = [
       { name: 'to',    type: 'address', indexed: true  },
       { name: 'value', type: 'uint256', indexed: false },
     ],
+  },
+] as const;
+
+export const SAFE_PROXY_FACTORY_ABI = [
+  {
+    name: 'createProxyWithNonce',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_singleton',  type: 'address' },
+      { name: 'initializer', type: 'bytes'   },
+      { name: 'saltNonce',   type: 'uint256' },
+    ],
+    outputs: [{ name: 'proxy', type: 'address' }],
+  },
+  {
+    name: 'proxyCreationCode',
+    type: 'function',
+    stateMutability: 'pure',
+    inputs: [],
+    outputs: [{ name: '', type: 'bytes' }],
+  },
+  {
+    name: 'ProxyCreation',
+    type: 'event',
+    inputs: [
+      { name: 'proxy',      type: 'address', indexed: false },
+      { name: 'singleton',  type: 'address', indexed: false },
+    ],
+  },
+] as const;
+
+export const SAFE_SETUP_ABI = [
+  {
+    name: 'setup',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_owners',         type: 'address[]' },
+      { name: '_threshold',      type: 'uint256'   },
+      { name: 'to',              type: 'address'   },
+      { name: 'data',            type: 'bytes'     },
+      { name: 'fallbackHandler', type: 'address'   },
+      { name: 'paymentToken',    type: 'address'   },
+      { name: 'payment',         type: 'uint256'   },
+      { name: 'paymentReceiver', type: 'address'   },
+    ],
+    outputs: [],
   },
 ] as const;

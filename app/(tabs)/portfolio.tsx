@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, StyleSheet, Alert, Linking,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { formatUnits } from 'viem';
 import { getConfig, getPrivateKey } from '@/lib/config-store';
 import { getPublicClient } from '@/lib/safe';
@@ -97,6 +97,39 @@ export default function PortfolioScreen() {
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
+  // Brand-new install: no Safe configured → show the onboarding pitch in place
+  // of the regular portfolio UI. We wait until `config` is loaded so we don't
+  // flash the welcome screen for users who already have a Safe.
+  if (config && !config.safeAddress) {
+    return (
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <View style={styles.welcomeCard}>
+          <Text style={styles.welcomeTitle}>Welcome to MeditFin</Text>
+          <Text style={styles.welcomeBody}>
+            You haven't set up a Safe yet. MeditFin needs a Safe account on Base
+            to run automated DCA buys on your behalf — the bot signs from a
+            local key but can never withdraw to anyone other than your Safe.
+          </Text>
+
+          <View style={styles.welcomeBullets}>
+            <Text style={styles.bullet}>• Generate a fresh signer key on this device</Text>
+            <Text style={styles.bullet}>• Deploy a 1-of-1 Safe on Base</Text>
+            <Text style={styles.bullet}>• Fund the signer with ETH and your Safe with USDC</Text>
+            <Text style={styles.bullet}>• Bot does daily DCA automatically — you keep custody</Text>
+          </View>
+
+          <TouchableOpacity style={styles.welcomeBtn} onPress={() => router.push('/onboarding')}>
+            <Text style={styles.welcomeBtnTxt}>Start setup</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => router.push('/(tabs)/settings')}>
+            <Text style={styles.welcomeLink}>I already have a Safe — configure manually</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  }
+
   const runBot = async () => {
     const pk = await getPrivateKey();
     if (!config?.safeAddress || !pk) {
@@ -141,10 +174,8 @@ export default function PortfolioScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Live Portfolio</Text>
-          {config?.safeAddress ? (
+          {config?.safeAddress && (
             <Text style={styles.address}>{config.safeAddress.slice(0, 10)}…{config.safeAddress.slice(-8)}</Text>
-          ) : (
-            <Text style={styles.noConfig}>Configure in Settings</Text>
           )}
         </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={refresh} disabled={loading}>
@@ -250,7 +281,14 @@ const styles = StyleSheet.create({
   header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, marginTop: 8 },
   title:        { fontSize: 20, fontWeight: '700', color: '#fff' },
   address:      { fontSize: 11, color: '#4b5563', fontVariant: ['tabular-nums'], marginTop: 2 },
-  noConfig:     { fontSize: 11, color: '#92400e', marginTop: 2 },
+  welcomeCard:  { backgroundColor: '#0b1220', borderColor: '#1f2937', borderWidth: 1, borderRadius: 16, padding: 20, marginTop: 40 },
+  welcomeTitle: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 10 },
+  welcomeBody:  { color: '#9ca3af', fontSize: 14, lineHeight: 21, marginBottom: 18 },
+  welcomeBullets:{ marginBottom: 22 },
+  bullet:       { color: '#d1d5db', fontSize: 13, lineHeight: 22 },
+  welcomeBtn:   { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 14 },
+  welcomeBtnTxt:{ color: '#fff', fontWeight: '700', fontSize: 15 },
+  welcomeLink:  { color: '#60a5fa', fontSize: 13, textAlign: 'center' },
   refreshBtn:   { backgroundColor: '#1f2937', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   refreshTxt:   { color: '#9ca3af', fontSize: 12 },
   grid:         { gap: 8, marginBottom: 12 },
