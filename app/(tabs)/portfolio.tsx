@@ -201,11 +201,16 @@ export default function PortfolioScreen() {
     ? live.wethInSafe * ethPrice + live.cbBtcInSafe * btcPrice + live.usdcInSafe
     : 0;
 
-  const totalInvested = positions.reduce((s, p) => s + p.usdcInvested, 0);
+  // Deployed P&L must compare **open** market value to **open** cost basis only.
+  // Previously we summed usdcInvested across *all* positions (including closed),
+  // which inflated the denominator and made $ / % wrong vs the Daily Coins.
+  const openCostBasis = openPositions.reduce((s, p) => s + p.usdcInvested, 0);
   const deployedValue = openPositions.reduce((s, p) => {
     const price = p.asset === 'ETH' ? ethPrice : btcPrice;
     return s + p.assetAmount * price;
   }, 0);
+  const deployedPnlUsd = deployedValue - openCostBasis;
+  const deployedPnlPct = openCostBasis > 0 ? (deployedPnlUsd / openCostBasis) * 100 : 0;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -237,9 +242,9 @@ export default function PortfolioScreen() {
           </View>
           <View style={styles.gridRow}>
             <StatCard label="Deployed P&L"
-              value={`${deployedValue - totalInvested >= 0 ? '+' : ''}$${fmt(deployedValue - totalInvested, 0)}`}
-              sub={`${totalInvested > 0 ? fmt(((deployedValue - totalInvested) / totalInvested) * 100) : '0.00'}%`}
-              positive={deployedValue >= totalInvested}
+              value={`${deployedPnlUsd >= 0 ? '+' : ''}$${fmt(deployedPnlUsd, 0)}`}
+              sub={`${openCostBasis > 0 ? fmt(deployedPnlPct) : '0.00'}%`}
+              positive={deployedPnlUsd >= 0}
             />
             <View style={styles.gap} />
             <StatCard label="Positions" value={String(openPositions.length)} sub={`of ${positions.length} total`} />

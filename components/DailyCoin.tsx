@@ -81,6 +81,8 @@ interface Props {
   position: CryptoPosition;
   onPress?: (p: CryptoPosition) => void;
   style?:   ViewStyle;
+  /** When set, tile fits a fixed grid column; coin scales down if needed. */
+  slotWidth?: number;
 }
 
 /**
@@ -88,7 +90,7 @@ interface Props {
  * displayed in the center is the position's **current dollar value** —
  * `finalValue` for OPEN positions or `usdcReceived` for CLOSED ones.
  */
-export default function DailyCoin({ position, onPress, style }: Props) {
+export default function DailyCoin({ position, onPress, style, slotWidth }: Props) {
   const v       = pickVariant(position);
   const isOpen  = position.status === 'OPEN';
   const value   = isOpen ? (position.finalValue   ?? position.assetAmount * (position.buyPrice ?? 0))
@@ -97,13 +99,18 @@ export default function DailyCoin({ position, onPress, style }: Props) {
   const pnlPos  = pnlPct >= 0;
   const glyph   = position.asset === 'ETH' ? 'Ξ' : '₿';
 
+  const wrapW   = slotWidth ?? COIN_SIZE + 8;
+  const innerW  = COIN_SIZE + 8;
+  const scale = slotWidth != null ? Math.min(1, (wrapW - 2) / innerW) : 1;
+
   return (
     <TouchableOpacity
       onPress={() => onPress?.(position)}
       activeOpacity={0.7}
-      style={[styles.wrap, style]}
+      style={[styles.wrap, { width: wrapW }, style]}
     >
-      <View style={[styles.coin, { backgroundColor: v.face, borderColor: v.rim }]}>
+      <View style={[styles.scaleBox, { transform: [{ scale }] }]}>
+        <View style={[styles.coin, { backgroundColor: v.face, borderColor: v.rim }]}>
         {/* Top-left specular highlight gives a metallic 3D feel without SVG */}
         <View style={[styles.shineTop, { backgroundColor: v.shine }]} />
         <View style={[styles.shineSide, { backgroundColor: v.shine }]} />
@@ -121,6 +128,7 @@ export default function DailyCoin({ position, onPress, style }: Props) {
       </View>
 
       <Text style={styles.date}>{position.buyDate.slice(5)}</Text>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -128,7 +136,10 @@ export default function DailyCoin({ position, onPress, style }: Props) {
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    width:      COIN_SIZE + 8,
+    marginBottom: 4,
+  },
+  scaleBox: {
+    alignItems: 'center',
   },
   coin: {
     width:           COIN_SIZE,

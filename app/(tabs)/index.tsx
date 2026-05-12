@@ -19,7 +19,8 @@ const PERIODS = [
   { label: '1Y',   days: 365  },
   { label: '2Y',   days: 730  },
   { label: '3Y',   days: 1095 },
-  { label: 'All',  days: 2000 },
+  { label: '4Y',   days: 1460 },
+  { label: '5Y',   days: 1825 }
 ];
 
 function fmt(n: number, d = 2): string {
