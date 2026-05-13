@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import CoinPile from './CoinPile';
 import DailyCoin from './DailyCoin';
-import type { CryptoPosition } from '@/lib/types';
+import type { CryptoPosition, PositionLifecycleEvent } from '@/lib/types';
 import {
   flattenMonthPositions,
   flattenYearPositions,
@@ -53,6 +53,22 @@ interface Props {
   positions: CryptoPosition[];
 }
 
+function fmtLifecycle(ev: PositionLifecycleEvent): string {
+  const px = `$${fmt(ev.price, 0)}`;
+  if (ev.action === 'open') {
+    return `${ev.date}  ·  Open @ ${px}  ·  $${fmt(ev.usdcInvested ?? 0)} in  ·  ${fmt(ev.assetAmount ?? 0, 6)} units`;
+  }
+  if (ev.action === 'reopen') {
+    return `${ev.date}  ·  Reopen @ ${px}  ·  $${fmt(ev.usdcInvested ?? 0)} in  ·  ${fmt(ev.assetAmount ?? 0, 6)} units`;
+  }
+  if (ev.action === 'close_take_profit') {
+    const pp = ev.profitPct ?? 0;
+    return `${ev.date}  ·  Close (take-profit) @ ${px}  ·  ${pp >= 0 ? '+' : ''}${fmt(pp)}%  ·  $${fmt(ev.usdcReceived ?? 0)} out`;
+  }
+  const pp = ev.profitPct ?? 0;
+  return `${ev.date}  ·  Close (stop-loss) @ ${px}  ·  ${fmt(pp)}%  ·  $${fmt(ev.usdcReceived ?? 0)} out`;
+}
+
 export default function CoinVault({ positions }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const [filter, setFilter] = useState<CoinFilter>('all');
@@ -78,7 +94,9 @@ export default function CoinVault({ positions }: Props) {
         case 'open':   return isOpen;
         case 'closed': return !isOpen;
         case 'profit': return pnl >= 0;
-        case 'loss':   return pnl <  0;
+        case 'loss':
+          if (isOpen) return pnl < 0;
+          return (p.profitPct ?? 0) < 0 || p.closeReason === 'stop_loss';
         default:       return true;
       }
     });
@@ -130,6 +148,8 @@ export default function CoinVault({ positions }: Props) {
     const refPrice = isOpen ? (p.finalPrice ?? p.buyPrice) : (p.sellPrice ?? p.buyPrice);
     const lines = [
       `${p.asset}  ·  ${p.status}`,
+      ...(!isOpen && p.closeReason === 'stop_loss' ? ['Exit: stop-loss'] : []),
+      ...(!isOpen && p.closeReason === 'take_profit' ? ['Exit: take-profit'] : []),
       `Bought ${p.buyDate} @ $${fmt(p.buyPrice, 0)}`,
       isOpen
         ? `Now    @ $${fmt(refPrice, 0)}`
@@ -139,7 +159,11 @@ export default function CoinVault({ positions }: Props) {
       `Value:    $${fmt(value)}`,
       `P&L:      ${pnlPct >= 0 ? '+' : ''}$${fmt(pnlUsd)} (${pnlPct >= 0 ? '+' : ''}${fmt(pnlPct)}%)`,
     ];
-    Alert.alert('Daily Coin', lines.join('\n'));
+    const lifeLines =
+      p.lifecycle && p.lifecycle.length > 0
+        ? ['', '— Activity (opens / closes / reopens) —', ...p.lifecycle.map(fmtLifecycle)]
+        : [];
+    Alert.alert('Daily Coin', [...lines, ...lifeLines].join('\n'));
   }, []);
 
   const drillHint =
@@ -175,7 +199,7 @@ export default function CoinVault({ positions }: Props) {
 
       <View style={styles.legendRow}>
         <Legend swatch="#fbbf24" border="#78350f" label="Gold · win" />
-        <Legend swatch="#a16207" border="#451a03" label="Bronze · loss" />
+        <Legend swatch="#a16207" border="#451a03" label="Bronze · loss / stop-loss" />
         <Legend swatch="#bbf7d0" border="#166534" label="Live · earning" />
         <Legend swatch="#fecaca" border="#991b1b" label="Live · down" />
       </View>

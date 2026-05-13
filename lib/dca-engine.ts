@@ -1,7 +1,24 @@
-import type { DailyPrice, SimulationDay, SimulationResult, BacktestConfig, CryptoPosition, UsdcPosition } from './types';
+import type {
+  DailyPrice,
+  SimulationDay,
+  SimulationResult,
+  BacktestConfig,
+  CryptoPosition,
+  UsdcPosition,
+  PositionLifecycleEvent,
+} from './types';
 
 function toDateMap(prices: DailyPrice[]): Map<string, number> {
   return new Map(prices.map((p) => [p.date, p.price]));
+}
+
+function openLifecycle(
+  date: string,
+  price: number,
+  usdc: number,
+  assetAmount: number,
+): PositionLifecycleEvent[] {
+  return [{ date, action: 'open', price, usdcInvested: usdc, assetAmount }];
 }
 
 export function runSimulation(
@@ -27,6 +44,11 @@ export function runSimulation(
   let totalUsdcFromSells = 0;
   const days: SimulationDay[] = [];
 
+  const slPct   = config.stopLossPct ?? 10;
+  const slOn    = config.stopLossEnabled === true && slPct > 0;
+  const reopenPct = config.reopenDownPct ?? 5;
+  const reopenOn  = config.reopenEnabled === true && reopenPct > 0;
+
   for (const date of allDates) {
     const ethPrice = ethMap.get(date)!;
     const btcPrice = btcMap.get(date)!;
@@ -34,19 +56,34 @@ export function runSimulation(
     let dailyUsdcReceived = 0;
     let positionsClosed = 0;
 
+    // ── 1a. Close OPEN legs (take-profit wins over stop-loss if both matched) ─
     for (const pos of cryptoPositions) {
       if (pos.status !== 'OPEN') continue;
       const price = pos.asset === 'ETH' ? ethPrice : btcPrice;
       const pnlPct = ((price - pos.buyPrice) / pos.buyPrice) * 100;
-      if (pnlPct < config.profitThreshold) continue;
+      const takeProfit = pnlPct >= config.profitThreshold;
+      const stopLoss   = slOn && pnlPct <= -slPct;
+      if (!takeProfit && !stopLoss) continue;
 
       const usdcReceived = pos.assetAmount * price;
-      pos.status       = 'CLOSED';
-      pos.sellDate     = date;
-      pos.sellPrice    = price;
-      pos.usdcReceived = usdcReceived;
-      pos.profitUsd    = usdcReceived - pos.usdcInvested;
-      pos.profitPct    = pnlPct;
+      pos.status        = 'CLOSED';
+      pos.sellDate      = date;
+      pos.sellPrice     = price;
+      pos.usdcReceived  = usdcReceived;
+      pos.profitUsd     = usdcReceived - pos.usdcInvested;
+      pos.profitPct     = pnlPct;
+      pos.closeReason   = takeProfit ? 'take_profit' : 'stop_loss';
+
+      const closeAction = takeProfit ? 'close_take_profit' : 'close_stop_loss';
+      const life = pos.lifecycle ?? openLifecycle(pos.buyDate, pos.buyPrice, pos.usdcInvested, pos.assetAmount);
+      if (!pos.lifecycle) pos.lifecycle = life;
+      pos.lifecycle.push({
+        date,
+        action:       closeAction,
+        price,
+        usdcReceived,
+        profitPct:    pnlPct,
+      });
 
       const usdcId = nextId();
       pos.usdcPositionId = usdcId;
@@ -64,18 +101,66 @@ export function runSimulation(
       positionsClosed++;
     }
 
+    // ── 1b. Reopen CLOSED legs when spot is down reopenPct % from last exit ─
+    if (reopenOn) {
+      for (const pos of cryptoPositions) {
+        if (pos.status !== 'CLOSED' || pos.sellPrice == null || pos.usdcReceived == null) continue;
+        const price   = pos.asset === 'ETH' ? ethPrice : btcPrice;
+        const trigger = pos.sellPrice * (1 - reopenPct / 100);
+        if (price > trigger) continue;
+
+        const usdc        = pos.usdcReceived;
+        const assetAmount = usdc / price;
+        totalUsdcFromSells -= usdc;
+
+        pos.status       = 'OPEN';
+        pos.buyDate      = date;
+        pos.buyPrice     = price;
+        pos.usdcInvested = usdc;
+        pos.assetAmount  = assetAmount;
+        pos.sellDate     = undefined;
+        pos.sellPrice    = undefined;
+        pos.usdcReceived = undefined;
+        pos.profitUsd    = undefined;
+        pos.profitPct    = undefined;
+        pos.closeReason  = undefined;
+        pos.usdcPositionId = undefined;
+
+        const life = pos.lifecycle ?? [];
+        pos.lifecycle = life;
+        pos.lifecycle.push({
+          date,
+          action:       'reopen',
+          price,
+          usdcInvested: usdc,
+          assetAmount,
+        });
+      }
+    }
+
+    // ── 2. Daily new DCA buys ───────────────────────────────────────────────
+    const ethAmt = config.dailyAmountEth / ethPrice;
+    const btcAmt = config.dailyAmountBtc / btcPrice;
     cryptoPositions.push(
       {
-        id: nextId(), asset: 'ETH', buyDate: date, buyPrice: ethPrice,
+        id:           nextId(),
+        asset:        'ETH',
+        buyDate:      date,
+        buyPrice:     ethPrice,
         usdcInvested: config.dailyAmountEth,
-        assetAmount: config.dailyAmountEth / ethPrice,
-        status: 'OPEN',
+        assetAmount:  ethAmt,
+        status:       'OPEN',
+        lifecycle:    openLifecycle(date, ethPrice, config.dailyAmountEth, ethAmt),
       },
       {
-        id: nextId(), asset: 'BTC', buyDate: date, buyPrice: btcPrice,
+        id:           nextId(),
+        asset:        'BTC',
+        buyDate:      date,
+        buyPrice:     btcPrice,
         usdcInvested: config.dailyAmountBtc,
-        assetAmount: config.dailyAmountBtc / btcPrice,
-        status: 'OPEN',
+        assetAmount:  btcAmt,
+        status:       'OPEN',
+        lifecycle:    openLifecycle(date, btcPrice, config.dailyAmountBtc, btcAmt),
       },
     );
     totalInvested += config.dailyAmountEth + config.dailyAmountBtc;

@@ -11,9 +11,10 @@ function discPalette(p: CryptoPosition): { face: string; rim: string } {
       ? { face: '#bbf7d0', rim: '#166534' }
       : { face: '#fecaca', rim: '#991b1b' };
   }
-  return pnl >= 0
-    ? { face: '#fbbf24', rim: '#78350f' }
-    : { face: '#a16207', rim: '#451a03' };
+  if (p.closeReason === 'stop_loss' || pnl < 0) {
+    return { face: '#a16207', rim: '#451a03' };
+  }
+  return { face: '#fbbf24', rim: '#78350f' };
 }
 
 export interface CoinPileProps {

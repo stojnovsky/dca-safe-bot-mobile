@@ -2,8 +2,9 @@ import { formatUnits } from 'viem';
 import { getPublicClient } from './safe';
 import { swapUsdcForAsset, swapUsdcForEthAndBtcPair, swapAssetForUsdc } from './swap';
 import {
-  createPosition, closePosition,
+  createPosition, closePosition, reopenPosition,
   createUsdcPosition, getOpenPositions, hasPositionForDate,
+  getClosedPositionsForReopen, getPositionById,
 } from './position-store';
 import { CONTRACTS, ERC20_ABI, PRICE_API_URL } from './constants';
 import type { BotConfig } from './types';
@@ -41,12 +42,19 @@ export async function runDailyDca(config: BotConfig, privateKey: `0x${string}`):
   const safeAddress = config.safeAddress as `0x${string}`;
   const { eth: ethPrice, btc: btcPrice } = await getLivePrices();
 
-  // ── 1. SELL positions above profit threshold ─────────────────────────────
+  // ── 1. SELL: take-profit first, else optional stop-loss (same pass) ───────
   const openPositions = await getOpenPositions();
+  const slPct = config.stopLossPct ?? 10;
+  const slOn  = config.stopLossEnabled === true && slPct > 0;
+
   for (const pos of openPositions) {
     const currentPrice = pos.asset === 'ETH' ? ethPrice : btcPrice;
     const pnlPct = ((currentPrice - pos.buyPrice) / pos.buyPrice) * 100;
-    if (pnlPct < config.profitThreshold) continue;
+    const takeProfit = pnlPct >= config.profitThreshold;
+    const stopLoss   = slOn && pnlPct <= -slPct;
+    if (!takeProfit && !stopLoss) continue;
+
+    const closeReason = takeProfit ? 'take_profit' : 'stop_loss';
 
     try {
       const { txHash, usdcReceived } = await swapAssetForUsdc(
@@ -59,6 +67,7 @@ export async function runDailyDca(config: BotConfig, privateKey: `0x${string}`):
         sellTxHash:   txHash,
         profitUsd:    usdcReceived - pos.usdcInvested,
         profitPct:    pnlPct,
+        closeReason,
       });
       await createUsdcPosition({
         sourceAsset:      pos.asset,
@@ -70,6 +79,39 @@ export async function runDailyDca(config: BotConfig, privateKey: `0x${string}`):
       result.sells.push({ asset: pos.asset, txHash, usdcReceived, profitPct: pnlPct });
     } catch (e) {
       result.errors.push(`sell ${pos.asset} ${pos.id}: ${e}`);
+    }
+  }
+
+  // ── 1b. Reopen closed rows when price is down reopenDownPct % from last exit ─
+  const reopenPct = config.reopenDownPct ?? 5;
+  const reopenOn  = config.reopenEnabled === true && reopenPct > 0;
+  if (reopenOn) {
+    const candidates = await getClosedPositionsForReopen();
+    for (const pos of candidates) {
+      const latest = await getPositionById(pos.id);
+      if (!latest || latest.status !== 'CLOSED' || latest.sellPrice == null || latest.usdcReceived == null) continue;
+
+      const currentPrice = latest.asset === 'ETH' ? ethPrice : btcPrice;
+      if (currentPrice > latest.sellPrice * (1 - reopenPct / 100)) continue;
+
+      const usdc = latest.usdcReceived;
+      if (usdc < 1) continue;
+
+      try {
+        const { txHash, assetAmount } = await swapUsdcForAsset(
+          usdc, latest.asset, safeAddress, privateKey, config.rpcUrl,
+        );
+        await reopenPosition(latest.id, {
+          buyDate:      today,
+          buyPrice:     currentPrice,
+          usdcInvested: usdc,
+          assetAmount,
+          buyTxHash:    txHash,
+        });
+        result.buys.push({ asset: latest.asset, txHash, assetAmount, price: currentPrice });
+      } catch (e) {
+        result.errors.push(`reopen ${latest.asset} ${latest.id}: ${e}`);
+      }
     }
   }
 

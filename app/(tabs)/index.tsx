@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, StyleSheet, Alert,
+  ActivityIndicator, StyleSheet, Alert, Switch,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { runSimulation } from '@/lib/dca-engine';
@@ -27,8 +27,19 @@ function fmt(n: number, d = 2): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
+function parsePos(v: string, fallback: number): number {
+  const n = parseFloat(v);
+  return !isNaN(n) && n > 0 ? n : fallback;
+}
+
 export default function SimulationScreen() {
-  const [config, setConfig]   = useState<BacktestConfig>({ dailyAmountEth: 5, dailyAmountBtc: 5, profitThreshold: 5 });
+  const [ethStr, setEthStr]       = useState('5');
+  const [btcStr, setBtcStr]       = useState('5');
+  const [profitStr, setProfitStr] = useState('5');
+  const [slEn, setSlEn]           = useState(false);
+  const [slStr, setSlStr]         = useState('10');
+  const [reopenEn, setReopenEn]   = useState(false);
+  const [reopenStr, setReopenStr] = useState('5');
   const [period, setPeriod]   = useState(365);
   const prefs = useConfig();
   const gamify = prefs?.gamifyPositions !== false;
@@ -37,17 +48,25 @@ export default function SimulationScreen() {
   const [seeding, setSeeding] = useState(false);
   const [coverage, setCoverage] = useState<{ from: string | null; count: number } | null>(null);
 
+  const backtest = useMemo((): BacktestConfig => ({
+    dailyAmountEth:  parsePos(ethStr, 5),
+    dailyAmountBtc:  parsePos(btcStr, 5),
+    profitThreshold: parsePos(profitStr, 5),
+    stopLossEnabled: slEn,
+    stopLossPct:     parsePos(slStr, 10),
+    reopenEnabled:   reopenEn,
+    reopenDownPct:   parsePos(reopenStr, 5),
+  }), [ethStr, btcStr, profitStr, slEn, slStr, reopenEn, reopenStr]);
+
+  const backtestRef = useRef(backtest);
+  backtestRef.current = backtest;
+
   const loadCoverage = useCallback(async () => {
     try {
       const cov = await getPriceCoverage();
       setCoverage({ from: cov.ethereum.from, count: cov.ethereum.count });
     } catch { /* ignore */ }
   }, []);
-
-  useFocusEffect(useCallback(() => {
-    loadCoverage();
-    runSim(period, config);
-  }, [])); // eslint-disable-line
 
   const runSim = useCallback(async (days: number, cfg: BacktestConfig) => {
     setLoading(true);
@@ -74,13 +93,18 @@ export default function SimulationScreen() {
     }
   }, []);
 
+  useFocusEffect(useCallback(() => {
+    loadCoverage();
+    runSim(period, backtestRef.current);
+  }, [period, loadCoverage, runSim]));
+
   const syncHistory = async () => {
     setSeeding(true);
     try {
       const counts = await seedAllPrices(HISTORY_START);
       await loadCoverage();
       Alert.alert('Done', `Synced ${counts.ethereum} ETH + ${counts.bitcoin} BTC price records.`);
-      runSim(period, config);
+      runSim(period, backtest);
     } catch (e) {
       Alert.alert('Sync failed', String(e));
     } finally {
@@ -99,31 +123,105 @@ export default function SimulationScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionLabel}>Strategy Parameters</Text>
         <View style={styles.row}>
-          {[
-            { key: 'dailyAmountEth',  label: 'ETH buy/day',  unit: 'USDC' },
-            { key: 'dailyAmountBtc',  label: 'BTC buy/day',  unit: 'USDC' },
-            { key: 'profitThreshold', label: 'Sell at',       unit: '%' },
-          ].map(({ key, label, unit }) => (
-            <View key={key} style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>{label}</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={String(config[key as keyof BacktestConfig])}
-                  onChangeText={(v) => {
-                    const n = parseFloat(v);
-                    if (!isNaN(n) && n > 0) setConfig((c) => ({ ...c, [key]: n }));
-                  }}
-                />
-                <Text style={styles.unit}>{unit}</Text>
-              </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>ETH buy/day</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={ethStr}
+                onChangeText={setEthStr}
+              />
+              <Text style={styles.unit}>USDC</Text>
             </View>
-          ))}
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>BTC buy/day</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={btcStr}
+                onChangeText={setBtcStr}
+              />
+              <Text style={styles.unit}>USDC</Text>
+            </View>
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Sell at</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={profitStr}
+                onChangeText={setProfitStr}
+              />
+              <Text style={styles.unit}>%</Text>
+            </View>
+          </View>
         </View>
+
+        <View style={styles.slRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.slLabel}>Stop-loss</Text>
+            <Text style={styles.slSub}>
+              When on, the backtest sells if price is down this % from your buy (after take-profit checks).
+            </Text>
+          </View>
+          <Switch
+            value={slEn}
+            onValueChange={setSlEn}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
+        </View>
+        {slEn ? (
+          <View style={styles.slPctRow}>
+            <Text style={styles.inputLabel}>Sell if down</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={slStr}
+                onChangeText={setSlStr}
+              />
+              <Text style={styles.unit}>% from buy</Text>
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.slRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.slLabel}>Reopen on dip</Text>
+            <Text style={styles.slSub}>
+              When on, a closed row can open again if spot falls at least this % below the price at which it last sold.
+            </Text>
+          </View>
+          <Switch
+            value={reopenEn}
+            onValueChange={setReopenEn}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
+        </View>
+        {reopenEn ? (
+          <View style={styles.slPctRow}>
+            <Text style={styles.inputLabel}>Reopen if down</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={reopenStr}
+                onChangeText={setReopenStr}
+              />
+              <Text style={styles.unit}>% from last exit</Text>
+            </View>
+          </View>
+        ) : null}
+
         <TouchableOpacity
           style={styles.btn}
-          onPress={() => runSim(period, config)}
+          onPress={() => runSim(period, backtest)}
           disabled={loading}
         >
           <Text style={styles.btnText}>{loading ? 'Running…' : 'Run Simulation'}</Text>
@@ -137,7 +235,7 @@ export default function SimulationScreen() {
             <TouchableOpacity
               key={days}
               style={[styles.periodBtn, period === days && styles.periodBtnActive]}
-              onPress={() => { setPeriod(days); runSim(days, config); }}
+              onPress={() => { setPeriod(days); runSim(days, backtest); }}
             >
               <Text style={[styles.periodLabel, period === days && styles.periodLabelActive]}>
                 {label}
@@ -263,6 +361,7 @@ function PositionsTable({
               </Text>
               <Text style={styles.tableMeta}>
                 ${fmt(p.usdcInvested)} → ${fmt(currVal)} · {isOpen ? 'now' : 'sell'} ${fmt(refPrice, 0)} (buy ${fmt(p.buyPrice, 0)})
+                {!isOpen && p.closeReason === 'stop_loss' ? ' · stop-loss' : ''}
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -321,6 +420,10 @@ const styles = StyleSheet.create({
   tableBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#1f2937', marginTop: 4 },
   tableBadgeOpen: { backgroundColor: '#1e3a8a' },
   tableBadgeTxt: { fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' },
+  slRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1f2937' },
+  slLabel:       { fontSize: 13, fontWeight: '600', color: '#e5e7eb' },
+  slSub:         { fontSize: 10, color: '#6b7280', marginTop: 4, lineHeight: 14 },
+  slPctRow:      { marginTop: 10 },
   eth:         { color: '#60a5fa' },
   btc:         { color: '#fb923c' },
 });

@@ -80,6 +80,8 @@ function enrichForVault(
     finalValue,
     unrealizedPnlUsd,
     unrealizedPnlPct,
+    closeReason:    p.closeReason,
+    lifecycle:      p.lifecycle,
   };
 }
 

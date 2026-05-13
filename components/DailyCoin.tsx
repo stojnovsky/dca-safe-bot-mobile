@@ -58,6 +58,7 @@ function pickVariant(p: CryptoPosition): Variant {
   const isOpen = p.status === 'OPEN';
   const pnl    = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
   if (isOpen) return pnl >= 0 ? LIVE_PROFIT : LIVE_LOSS;
+  if (p.closeReason === 'stop_loss') return GOLD_LOSS;
   return pnl >= 0 ? GOLD_PROFIT : GOLD_LOSS;
 }
 

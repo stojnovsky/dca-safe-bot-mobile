@@ -63,6 +63,7 @@ function pickVariant(p: CryptoPosition): Variant {
   const isOpen = p.status === 'OPEN';
   const pnl    = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
   if (isOpen) return pnl >= 0 ? LIVE_HEALTHY : WILTING;
+  if (p.closeReason === 'stop_loss') return ROTTEN;
   return pnl >= 0 ? HEALTHY : ROTTEN;
 }
 

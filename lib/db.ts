@@ -50,5 +50,15 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE INDEX IF NOT EXISTS idx_bot_runs_ts ON bot_runs(timestamp DESC);
   `);
+  try {
+    await _db.execAsync('ALTER TABLE positions ADD COLUMN close_reason TEXT;');
+  } catch {
+    /* column already exists */
+  }
+  try {
+    await _db.execAsync('ALTER TABLE positions ADD COLUMN lifecycle_json TEXT;');
+  } catch {
+    /* column already exists */
+  }
   return _db;
 }

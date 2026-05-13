@@ -29,6 +29,10 @@ const DEFAULT_CONFIG: BotConfig = {
   dailyAmountEth:  5,
   dailyAmountBtc:  5,
   profitThreshold: 5,
+  stopLossEnabled: false,
+  stopLossPct:     10,
+  reopenEnabled:   false,
+  reopenDownPct:   5,
   showLogsTab:     false,
   gamifyPositions: true,
 };

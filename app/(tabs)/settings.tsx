@@ -17,6 +17,19 @@ import {
 import * as BackgroundTask from 'expo-background-task';
 import type { BotConfig } from '@/lib/types';
 
+function parsePos(v: string, fallback: number): number {
+  const n = parseFloat(v);
+  return !isNaN(n) && n > 0 ? n : fallback;
+}
+
+type NumDraft = {
+  dailyAmountEth: string;
+  dailyAmountBtc: string;
+  profitThreshold: string;
+  stopLossPct: string;
+  reopenDownPct: string;
+};
+
 function Field({ label, sub, value, onChangeText, secureTextEntry, placeholder, mono }: {
   label: string; sub?: string; value: string;
   onChangeText: (v: string) => void;
@@ -43,7 +56,27 @@ function Field({ label, sub, value, onChangeText, secureTextEntry, placeholder, 
 }
 
 export default function SettingsScreen() {
-  const [config,  setConfig]  = useState<BotConfig>({ safeAddress: '', rpcUrl: DEFAULT_RPC, pricesApiUrl: DEFAULT_PRICES_API_URL, dailyAmountEth: 5, dailyAmountBtc: 5, profitThreshold: 5 });
+  const [config,  setConfig]  = useState<BotConfig>({
+    safeAddress: '',
+    rpcUrl: DEFAULT_RPC,
+    pricesApiUrl: DEFAULT_PRICES_API_URL,
+    dailyAmountEth: 5,
+    dailyAmountBtc: 5,
+    profitThreshold: 5,
+    stopLossEnabled: false,
+    stopLossPct: 10,
+    reopenEnabled: false,
+    reopenDownPct: 5,
+    showLogsTab: false,
+    gamifyPositions: true,
+  });
+  const [numDraft, setNumDraft] = useState<NumDraft>({
+    dailyAmountEth: '5',
+    dailyAmountBtc: '5',
+    profitThreshold: '5',
+    stopLossPct: '10',
+    reopenDownPct: '5',
+  });
   const [pk,      setPk]      = useState('');
   const [botOn,   setBotOn]   = useState(false);
   const [bgStatus, setBgStatus] = useState<BackgroundTask.BackgroundTaskStatus | null>(null);
@@ -58,6 +91,13 @@ export default function SettingsScreen() {
         isDcaTaskRegistered(), getBackgroundTaskStatus(),
       ]);
       setConfig(cfg);
+      setNumDraft({
+        dailyAmountEth: String(cfg.dailyAmountEth),
+        dailyAmountBtc: String(cfg.dailyAmountBtc),
+        profitThreshold: String(cfg.profitThreshold),
+        stopLossPct: String(cfg.stopLossPct ?? 10),
+        reopenDownPct: String(cfg.reopenDownPct ?? 5),
+      });
       if (storedPk) setPk(storedPk);
       setBotOn(registered);
       setBgStatus(status);
@@ -66,7 +106,14 @@ export default function SettingsScreen() {
 
   const save = async () => {
     try {
-      await saveConfig(config);
+      await saveConfig({
+        ...config,
+        dailyAmountEth:  parsePos(numDraft.dailyAmountEth, config.dailyAmountEth),
+        dailyAmountBtc:  parsePos(numDraft.dailyAmountBtc, config.dailyAmountBtc),
+        profitThreshold: parsePos(numDraft.profitThreshold, config.profitThreshold),
+        stopLossPct:     parsePos(numDraft.stopLossPct, config.stopLossPct ?? 10),
+        reopenDownPct:   parsePos(numDraft.reopenDownPct, config.reopenDownPct ?? 5),
+      });
       if (pk) await savePrivateKey(pk);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -151,11 +198,6 @@ export default function SettingsScreen() {
     bgStatus === BackgroundTask.BackgroundTaskStatus.Restricted ? 'Restricted (Background App Refresh disabled)' :
     bgStatus === null                                           ? '…'          : 'Unknown';
 
-  const set = (key: keyof BotConfig) => (v: string) => {
-    const numeric = ['dailyAmountEth', 'dailyAmountBtc', 'profitThreshold'];
-    setConfig((c) => ({ ...c, [key]: numeric.includes(key) ? parseFloat(v) || 0 : v }));
-  };
-
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Settings</Text>
@@ -163,9 +205,9 @@ export default function SettingsScreen() {
       {/* Safe wallet */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Safe Wallet</Text>
-        <Field label="Safe Address" placeholder="0x…" value={config.safeAddress} onChangeText={set('safeAddress')} mono />
+        <Field label="Safe Address" placeholder="0x…" value={config.safeAddress} onChangeText={(v) => setConfig((c) => ({ ...c, safeAddress: v }))} mono />
         <Field label="Bot Private Key" sub="Stored in iOS Keychain (Secure Enclave)" placeholder="0x…" value={pk} onChangeText={setPk} secureTextEntry mono />
-        <Field label="RPC URL" placeholder={DEFAULT_RPC} value={config.rpcUrl} onChangeText={set('rpcUrl')} mono />
+        <Field label="RPC URL" placeholder={DEFAULT_RPC} value={config.rpcUrl} onChangeText={(v) => setConfig((c) => ({ ...c, rpcUrl: v }))} mono />
 
         <TouchableOpacity style={styles.secondaryBtn} onPress={verifySafe}>
           <Text style={styles.secondaryBtnTxt}>Verify Safe on-chain</Text>
@@ -188,14 +230,62 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>DCA Strategy</Text>
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Field label="ETH buy / day" placeholder="5" value={String(config.dailyAmountEth)} onChangeText={set('dailyAmountEth')} />
+            <Field label="ETH buy / day" placeholder="5" value={numDraft.dailyAmountEth} onChangeText={(v) => setNumDraft((d) => ({ ...d, dailyAmountEth: v }))} />
           </View>
           <View style={{ width: 12 }} />
           <View style={{ flex: 1 }}>
-            <Field label="BTC buy / day" placeholder="5" value={String(config.dailyAmountBtc)} onChangeText={set('dailyAmountBtc')} />
+            <Field label="BTC buy / day" placeholder="5" value={numDraft.dailyAmountBtc} onChangeText={(v) => setNumDraft((d) => ({ ...d, dailyAmountBtc: v }))} />
           </View>
         </View>
-        <Field label="Sell at profit %" placeholder="5" value={String(config.profitThreshold)} onChangeText={set('profitThreshold')} />
+        <Field label="Sell at profit %" placeholder="5" value={numDraft.profitThreshold} onChangeText={(v) => setNumDraft((d) => ({ ...d, profitThreshold: v }))} />
+
+        <View style={[styles.toggleRow, { marginTop: 16 }]}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Stop-loss</Text>
+            <Text style={styles.toggleSub}>
+              Off by default. When enabled, the bot sells a position if the asset is down the stop-loss % from your buy (after take-profit checks). Shown as a bronze coin when closed.
+            </Text>
+          </View>
+          <Switch
+            value={config.stopLossEnabled === true}
+            onValueChange={(v) => setConfig((c) => ({ ...c, stopLossEnabled: v }))}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
+        </View>
+        {config.stopLossEnabled ? (
+          <Field
+            label="Stop-loss %"
+            sub="From buy price (e.g. 10 = sell at −10% or worse)"
+            placeholder="10"
+            value={numDraft.stopLossPct}
+            onChangeText={(v) => setNumDraft((d) => ({ ...d, stopLossPct: v }))}
+          />
+        ) : null}
+
+        <View style={[styles.toggleRow, { marginTop: 16 }]}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Reopen on dip</Text>
+            <Text style={styles.toggleSub}>
+              Off by default. When enabled, the bot can turn a closed row back into an open position if price falls at least the given % below the last exit price (uses USDC from that exit).
+            </Text>
+          </View>
+          <Switch
+            value={config.reopenEnabled === true}
+            onValueChange={(v) => setConfig((c) => ({ ...c, reopenEnabled: v }))}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
+        </View>
+        {config.reopenEnabled ? (
+          <Field
+            label="Reopen if down %"
+            sub="From last sell price (e.g. 5 = reopen when spot ≤ exit × (1 − 5%))"
+            placeholder="5"
+            value={numDraft.reopenDownPct}
+            onChangeText={(v) => setNumDraft((d) => ({ ...d, reopenDownPct: v }))}
+          />
+        ) : null}
       </View>
 
       {/* Prices API */}
@@ -206,7 +296,7 @@ export default function SettingsScreen() {
           sub="medit/prices-api backend serving BTC/ETH historical prices"
           placeholder={DEFAULT_PRICES_API_URL}
           value={config.pricesApiUrl}
-          onChangeText={set('pricesApiUrl')}
+          onChangeText={(v) => setConfig((c) => ({ ...c, pricesApiUrl: v }))}
           mono
         />
       </View>
