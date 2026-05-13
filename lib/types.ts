@@ -100,21 +100,25 @@ export interface SimulationResult {
 export interface BacktestConfig {
   dailyAmountEth: number;
   dailyAmountBtc: number;
-  profitThreshold: number;
+  /** Take-profit: sell ETH when unrealized gain ≥ this % from buy. */
+  profitThresholdEth: number;
+  /** Take-profit: sell BTC when unrealized gain ≥ this % from buy. */
+  profitThresholdBtc: number;
   /**
    * When true, close positions whose unrealized PnL from buy price is at or
-   * below negative stopLossPct (same day, after take-profit checks).
+   * below negative asset-specific stop-loss % (after take-profit checks).
    */
   stopLossEnabled?: boolean;
-  /** Positive magnitude, e.g. `10` = exit at −10% from entry. Ignored when disabled. */
-  stopLossPct?: number;
+  /** Stop-loss magnitude for ETH (e.g. 10 = exit at −10% from entry). */
+  stopLossPctEth?: number;
+  stopLossPctBtc?: number;
   /**
    * When true, a **closed** row can become OPEN again if spot falls at least
-   * **reopenDownPct** % below the price at which it was last sold.
+   * the asset-specific % below the price at which it was last sold.
    */
   reopenEnabled?: boolean;
-  /** Positive magnitude: reopen when spot is at or below last sell × (1 − pct/100). */
-  reopenDownPct?: number;
+  reopenDownPctEth?: number;
+  reopenDownPctBtc?: number;
 }
 
 export interface BotConfig extends BacktestConfig {

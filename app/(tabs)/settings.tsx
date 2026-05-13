@@ -22,12 +22,21 @@ function parsePos(v: string, fallback: number): number {
   return !isNaN(n) && n > 0 ? n : fallback;
 }
 
+/** For % knobs: allow 0 to disable that side (stop-loss / reopen) or use 0% take-profit. */
+function parseNonNeg(v: string, fallback: number): number {
+  const n = parseFloat(v);
+  return !isNaN(n) && n >= 0 ? n : fallback;
+}
+
 type NumDraft = {
   dailyAmountEth: string;
   dailyAmountBtc: string;
-  profitThreshold: string;
-  stopLossPct: string;
-  reopenDownPct: string;
+  profitThresholdEth: string;
+  profitThresholdBtc: string;
+  stopLossPctEth: string;
+  stopLossPctBtc: string;
+  reopenDownPctEth: string;
+  reopenDownPctBtc: string;
 };
 
 function Field({ label, sub, value, onChangeText, secureTextEntry, placeholder, mono }: {
@@ -62,20 +71,26 @@ export default function SettingsScreen() {
     pricesApiUrl: DEFAULT_PRICES_API_URL,
     dailyAmountEth: 5,
     dailyAmountBtc: 5,
-    profitThreshold: 5,
+    profitThresholdEth: 5,
+    profitThresholdBtc: 5,
     stopLossEnabled: false,
-    stopLossPct: 10,
+    stopLossPctEth: 10,
+    stopLossPctBtc: 10,
     reopenEnabled: false,
-    reopenDownPct: 5,
+    reopenDownPctEth: 5,
+    reopenDownPctBtc: 5,
     showLogsTab: false,
     gamifyPositions: true,
   });
   const [numDraft, setNumDraft] = useState<NumDraft>({
     dailyAmountEth: '5',
     dailyAmountBtc: '5',
-    profitThreshold: '5',
-    stopLossPct: '10',
-    reopenDownPct: '5',
+    profitThresholdEth: '5',
+    profitThresholdBtc: '5',
+    stopLossPctEth: '10',
+    stopLossPctBtc: '10',
+    reopenDownPctEth: '5',
+    reopenDownPctBtc: '5',
   });
   const [pk,      setPk]      = useState('');
   const [botOn,   setBotOn]   = useState(false);
@@ -94,9 +109,12 @@ export default function SettingsScreen() {
       setNumDraft({
         dailyAmountEth: String(cfg.dailyAmountEth),
         dailyAmountBtc: String(cfg.dailyAmountBtc),
-        profitThreshold: String(cfg.profitThreshold),
-        stopLossPct: String(cfg.stopLossPct ?? 10),
-        reopenDownPct: String(cfg.reopenDownPct ?? 5),
+        profitThresholdEth: String(cfg.profitThresholdEth ?? 5),
+        profitThresholdBtc: String(cfg.profitThresholdBtc ?? 5),
+        stopLossPctEth: String(cfg.stopLossPctEth ?? 10),
+        stopLossPctBtc: String(cfg.stopLossPctBtc ?? 10),
+        reopenDownPctEth: String(cfg.reopenDownPctEth ?? 5),
+        reopenDownPctBtc: String(cfg.reopenDownPctBtc ?? 5),
       });
       if (storedPk) setPk(storedPk);
       setBotOn(registered);
@@ -108,11 +126,14 @@ export default function SettingsScreen() {
     try {
       await saveConfig({
         ...config,
-        dailyAmountEth:  parsePos(numDraft.dailyAmountEth, config.dailyAmountEth),
-        dailyAmountBtc:  parsePos(numDraft.dailyAmountBtc, config.dailyAmountBtc),
-        profitThreshold: parsePos(numDraft.profitThreshold, config.profitThreshold),
-        stopLossPct:     parsePos(numDraft.stopLossPct, config.stopLossPct ?? 10),
-        reopenDownPct:   parsePos(numDraft.reopenDownPct, config.reopenDownPct ?? 5),
+        dailyAmountEth:       parsePos(numDraft.dailyAmountEth, config.dailyAmountEth),
+        dailyAmountBtc:       parsePos(numDraft.dailyAmountBtc, config.dailyAmountBtc),
+        profitThresholdEth: parseNonNeg(numDraft.profitThresholdEth, config.profitThresholdEth ?? 5),
+        profitThresholdBtc: parseNonNeg(numDraft.profitThresholdBtc, config.profitThresholdBtc ?? 5),
+        stopLossPctEth:     parseNonNeg(numDraft.stopLossPctEth, config.stopLossPctEth ?? 10),
+        stopLossPctBtc:     parseNonNeg(numDraft.stopLossPctBtc, config.stopLossPctBtc ?? 10),
+        reopenDownPctEth:   parseNonNeg(numDraft.reopenDownPctEth, config.reopenDownPctEth ?? 5),
+        reopenDownPctBtc:   parseNonNeg(numDraft.reopenDownPctBtc, config.reopenDownPctBtc ?? 5),
       });
       if (pk) await savePrivateKey(pk);
       setSaved(true);
@@ -237,13 +258,31 @@ export default function SettingsScreen() {
             <Field label="BTC buy / day" placeholder="5" value={numDraft.dailyAmountBtc} onChangeText={(v) => setNumDraft((d) => ({ ...d, dailyAmountBtc: v }))} />
           </View>
         </View>
-        <Field label="Sell at profit %" placeholder="5" value={numDraft.profitThreshold} onChangeText={(v) => setNumDraft((d) => ({ ...d, profitThreshold: v }))} />
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Sell ETH at +%"
+              placeholder="5"
+              value={numDraft.profitThresholdEth}
+              onChangeText={(v) => setNumDraft((d) => ({ ...d, profitThresholdEth: v }))}
+            />
+          </View>
+          <View style={{ width: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Sell BTC at +%"
+              placeholder="5"
+              value={numDraft.profitThresholdBtc}
+              onChangeText={(v) => setNumDraft((d) => ({ ...d, profitThresholdBtc: v }))}
+            />
+          </View>
+        </View>
 
         <View style={[styles.toggleRow, { marginTop: 16 }]}>
           <View style={{ flex: 1, marginRight: 12 }}>
             <Text style={styles.toggleLabel}>Stop-loss</Text>
             <Text style={styles.toggleSub}>
-              Off by default. When enabled, the bot sells a position if the asset is down the stop-loss % from your buy (after take-profit checks). Shown as a bronze coin when closed.
+              Off by default. When enabled, sells if unrealized PnL is at or below −ETH/BTC % from buy (after take-profit). Use 0% on one asset to skip stop-loss for that asset only.
             </Text>
           </View>
           <Switch
@@ -254,20 +293,34 @@ export default function SettingsScreen() {
           />
         </View>
         {config.stopLossEnabled ? (
-          <Field
-            label="Stop-loss %"
-            sub="From buy price (e.g. 10 = sell at −10% or worse)"
-            placeholder="10"
-            value={numDraft.stopLossPct}
-            onChangeText={(v) => setNumDraft((d) => ({ ...d, stopLossPct: v }))}
-          />
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Field
+                label="ETH max drawdown %"
+                sub="From buy (10 = −10%)"
+                placeholder="10"
+                value={numDraft.stopLossPctEth}
+                onChangeText={(v) => setNumDraft((d) => ({ ...d, stopLossPctEth: v }))}
+              />
+            </View>
+            <View style={{ width: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Field
+                label="BTC max drawdown %"
+                sub="From buy (10 = −10%)"
+                placeholder="10"
+                value={numDraft.stopLossPctBtc}
+                onChangeText={(v) => setNumDraft((d) => ({ ...d, stopLossPctBtc: v }))}
+              />
+            </View>
+          </View>
         ) : null}
 
         <View style={[styles.toggleRow, { marginTop: 16 }]}>
           <View style={{ flex: 1, marginRight: 12 }}>
             <Text style={styles.toggleLabel}>Reopen on dip</Text>
             <Text style={styles.toggleSub}>
-              Off by default. When enabled, the bot can turn a closed row back into an open position if price falls at least the given % below the last exit price (uses USDC from that exit).
+              Off by default. Reopens a closed leg when spot falls the ETH/BTC % below its last exit (re-uses exit USDC). Use 0% on one asset to never reopen that asset from dip alone.
             </Text>
           </View>
           <Switch
@@ -278,13 +331,27 @@ export default function SettingsScreen() {
           />
         </View>
         {config.reopenEnabled ? (
-          <Field
-            label="Reopen if down %"
-            sub="From last sell price (e.g. 5 = reopen when spot ≤ exit × (1 − 5%))"
-            placeholder="5"
-            value={numDraft.reopenDownPct}
-            onChangeText={(v) => setNumDraft((d) => ({ ...d, reopenDownPct: v }))}
-          />
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Field
+                label="ETH dip from exit %"
+                sub="e.g. 5 → spot ≤ exit × (1 − 5%)"
+                placeholder="5"
+                value={numDraft.reopenDownPctEth}
+                onChangeText={(v) => setNumDraft((d) => ({ ...d, reopenDownPctEth: v }))}
+              />
+            </View>
+            <View style={{ width: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Field
+                label="BTC dip from exit %"
+                sub="e.g. 5 → spot ≤ exit × (1 − 5%)"
+                placeholder="5"
+                value={numDraft.reopenDownPctBtc}
+                onChangeText={(v) => setNumDraft((d) => ({ ...d, reopenDownPctBtc: v }))}
+              />
+            </View>
+          </View>
         ) : null}
       </View>
 

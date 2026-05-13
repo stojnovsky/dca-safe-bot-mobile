@@ -8,6 +8,7 @@ import {
 } from './position-store';
 import { CONTRACTS, ERC20_ABI, PRICE_API_URL } from './constants';
 import type { BotConfig } from './types';
+import { reopenDownPctFor, stopLossPctFor, takeProfitPct } from './strategy-thresholds';
 
 const USDC_DECIMALS = 6;
 
@@ -44,14 +45,15 @@ export async function runDailyDca(config: BotConfig, privateKey: `0x${string}`):
 
   // ── 1. SELL: take-profit first, else optional stop-loss (same pass) ───────
   const openPositions = await getOpenPositions();
-  const slPct = config.stopLossPct ?? 10;
-  const slOn  = config.stopLossEnabled === true && slPct > 0;
+  const slOn = config.stopLossEnabled === true;
 
   for (const pos of openPositions) {
     const currentPrice = pos.asset === 'ETH' ? ethPrice : btcPrice;
     const pnlPct = ((currentPrice - pos.buyPrice) / pos.buyPrice) * 100;
-    const takeProfit = pnlPct >= config.profitThreshold;
-    const stopLoss   = slOn && pnlPct <= -slPct;
+    const pt = takeProfitPct(config, pos.asset);
+    const takeProfit = pnlPct >= pt;
+    const slPct = stopLossPctFor(config, pos.asset);
+    const stopLoss = slOn && slPct > 0 && pnlPct <= -slPct;
     if (!takeProfit && !stopLoss) continue;
 
     const closeReason = takeProfit ? 'take_profit' : 'stop_loss';
@@ -82,17 +84,17 @@ export async function runDailyDca(config: BotConfig, privateKey: `0x${string}`):
     }
   }
 
-  // ── 1b. Reopen closed rows when price is down reopenDownPct % from last exit ─
-  const reopenPct = config.reopenDownPct ?? 5;
-  const reopenOn  = config.reopenEnabled === true && reopenPct > 0;
-  if (reopenOn) {
+  // ── 1b. Reopen closed rows when price is down (per-asset %) from last exit ─
+  if (config.reopenEnabled === true) {
     const candidates = await getClosedPositionsForReopen();
     for (const pos of candidates) {
       const latest = await getPositionById(pos.id);
       if (!latest || latest.status !== 'CLOSED' || latest.sellPrice == null || latest.usdcReceived == null) continue;
 
       const currentPrice = latest.asset === 'ETH' ? ethPrice : btcPrice;
-      if (currentPrice > latest.sellPrice * (1 - reopenPct / 100)) continue;
+      const rdp = reopenDownPctFor(config, latest.asset);
+      if (rdp <= 0) continue;
+      if (currentPrice > latest.sellPrice * (1 - rdp / 100)) continue;
 
       const usdc = latest.usdcReceived;
       if (usdc < 1) continue;

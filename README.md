@@ -71,7 +71,7 @@ It also ships with a **historical backtester** so you can tune your strategy aga
          │
          ▼
    1. Fetch live ETH/BTC price (Ambire price API)
-   2. Close any position above `profitThreshold` (USDC ← asset)
+   2. Close any position above its asset take-profit (`profitThresholdEth` / `profitThresholdBtc`) or stop-loss when enabled (USDC ← asset)
    3. If Safe has enough USDC, buy `dailyAmountEth` ETH + `dailyAmountBtc` BTC
    4. Persist positions in local SQLite
 ```

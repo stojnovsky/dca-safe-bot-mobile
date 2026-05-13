@@ -7,6 +7,7 @@ import type {
   UsdcPosition,
   PositionLifecycleEvent,
 } from './types';
+import { reopenDownPctFor, stopLossPctFor, takeProfitPct } from './strategy-thresholds';
 
 function toDateMap(prices: DailyPrice[]): Map<string, number> {
   return new Map(prices.map((p) => [p.date, p.price]));
@@ -44,10 +45,7 @@ export function runSimulation(
   let totalUsdcFromSells = 0;
   const days: SimulationDay[] = [];
 
-  const slPct   = config.stopLossPct ?? 10;
-  const slOn    = config.stopLossEnabled === true && slPct > 0;
-  const reopenPct = config.reopenDownPct ?? 5;
-  const reopenOn  = config.reopenEnabled === true && reopenPct > 0;
+  const slOn = config.stopLossEnabled === true;
 
   for (const date of allDates) {
     const ethPrice = ethMap.get(date)!;
@@ -61,8 +59,10 @@ export function runSimulation(
       if (pos.status !== 'OPEN') continue;
       const price = pos.asset === 'ETH' ? ethPrice : btcPrice;
       const pnlPct = ((price - pos.buyPrice) / pos.buyPrice) * 100;
-      const takeProfit = pnlPct >= config.profitThreshold;
-      const stopLoss   = slOn && pnlPct <= -slPct;
+      const pt       = takeProfitPct(config, pos.asset);
+      const takeProfit = pnlPct >= pt;
+      const slPct      = stopLossPctFor(config, pos.asset);
+      const stopLoss   = slOn && slPct > 0 && pnlPct <= -slPct;
       if (!takeProfit && !stopLoss) continue;
 
       const usdcReceived = pos.assetAmount * price;
@@ -102,11 +102,13 @@ export function runSimulation(
     }
 
     // ── 1b. Reopen CLOSED legs when spot is down reopenPct % from last exit ─
-    if (reopenOn) {
+    if (config.reopenEnabled === true) {
       for (const pos of cryptoPositions) {
         if (pos.status !== 'CLOSED' || pos.sellPrice == null || pos.usdcReceived == null) continue;
+        const rdp = reopenDownPctFor(config, pos.asset);
+        if (rdp <= 0) continue;
         const price   = pos.asset === 'ETH' ? ethPrice : btcPrice;
-        const trigger = pos.sellPrice * (1 - reopenPct / 100);
+        const trigger = pos.sellPrice * (1 - rdp / 100);
         if (price > trigger) continue;
 
         const usdc        = pos.usdcReceived;

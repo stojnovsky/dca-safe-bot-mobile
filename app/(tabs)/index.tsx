@@ -32,14 +32,23 @@ function parsePos(v: string, fallback: number): number {
   return !isNaN(n) && n > 0 ? n : fallback;
 }
 
+/** Allow 0 to skip stop-loss / reopen for one asset, or 0% take-profit threshold. */
+function parseNonNeg(v: string, fallback: number): number {
+  const n = parseFloat(v);
+  return !isNaN(n) && n >= 0 ? n : fallback;
+}
+
 export default function SimulationScreen() {
   const [ethStr, setEthStr]       = useState('5');
   const [btcStr, setBtcStr]       = useState('5');
-  const [profitStr, setProfitStr] = useState('5');
+  const [profitEthStr, setProfitEthStr] = useState('5');
+  const [profitBtcStr, setProfitBtcStr] = useState('5');
   const [slEn, setSlEn]           = useState(false);
-  const [slStr, setSlStr]         = useState('10');
+  const [slEthStr, setSlEthStr]   = useState('10');
+  const [slBtcStr, setSlBtcStr]   = useState('10');
   const [reopenEn, setReopenEn]   = useState(false);
-  const [reopenStr, setReopenStr] = useState('5');
+  const [reopenEthStr, setReopenEthStr] = useState('5');
+  const [reopenBtcStr, setReopenBtcStr] = useState('5');
   const [period, setPeriod]   = useState(365);
   const prefs = useConfig();
   const gamify = prefs?.gamifyPositions !== false;
@@ -49,14 +58,17 @@ export default function SimulationScreen() {
   const [coverage, setCoverage] = useState<{ from: string | null; count: number } | null>(null);
 
   const backtest = useMemo((): BacktestConfig => ({
-    dailyAmountEth:  parsePos(ethStr, 5),
-    dailyAmountBtc:  parsePos(btcStr, 5),
-    profitThreshold: parsePos(profitStr, 5),
-    stopLossEnabled: slEn,
-    stopLossPct:     parsePos(slStr, 10),
-    reopenEnabled:   reopenEn,
-    reopenDownPct:   parsePos(reopenStr, 5),
-  }), [ethStr, btcStr, profitStr, slEn, slStr, reopenEn, reopenStr]);
+    dailyAmountEth:       parsePos(ethStr, 5),
+    dailyAmountBtc:       parsePos(btcStr, 5),
+    profitThresholdEth:   parseNonNeg(profitEthStr, 5),
+    profitThresholdBtc:   parseNonNeg(profitBtcStr, 5),
+    stopLossEnabled:      slEn,
+    stopLossPctEth:       parseNonNeg(slEthStr, 10),
+    stopLossPctBtc:       parseNonNeg(slBtcStr, 10),
+    reopenEnabled:        reopenEn,
+    reopenDownPctEth:     parseNonNeg(reopenEthStr, 5),
+    reopenDownPctBtc:     parseNonNeg(reopenBtcStr, 5),
+  }), [ethStr, btcStr, profitEthStr, profitBtcStr, slEn, slEthStr, slBtcStr, reopenEn, reopenEthStr, reopenBtcStr]);
 
   const backtestRef = useRef(backtest);
   backtestRef.current = backtest;
@@ -147,14 +159,29 @@ export default function SimulationScreen() {
               <Text style={styles.unit}>USDC</Text>
             </View>
           </View>
+        </View>
+
+        <View style={[styles.row, { marginTop: 10 }]}>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Sell at</Text>
+            <Text style={styles.inputLabel}>Sell ETH at +%</Text>
             <View style={styles.inputRow}>
               <TextInput
                 style={styles.input}
                 keyboardType="decimal-pad"
-                value={profitStr}
-                onChangeText={setProfitStr}
+                value={profitEthStr}
+                onChangeText={setProfitEthStr}
+              />
+              <Text style={styles.unit}>%</Text>
+            </View>
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Sell BTC at +%</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={profitBtcStr}
+                onChangeText={setProfitBtcStr}
               />
               <Text style={styles.unit}>%</Text>
             </View>
@@ -165,7 +192,7 @@ export default function SimulationScreen() {
           <View style={{ flex: 1, marginRight: 12 }}>
             <Text style={styles.slLabel}>Stop-loss</Text>
             <Text style={styles.slSub}>
-              When on, the backtest sells if price is down this % from your buy (after take-profit checks).
+              When on, sell if down the ETH/BTC % from buy (after take-profit). Set 0 on one side to skip that asset.
             </Text>
           </View>
           <Switch
@@ -176,16 +203,30 @@ export default function SimulationScreen() {
           />
         </View>
         {slEn ? (
-          <View style={styles.slPctRow}>
-            <Text style={styles.inputLabel}>Sell if down</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                keyboardType="decimal-pad"
-                value={slStr}
-                onChangeText={setSlStr}
-              />
-              <Text style={styles.unit}>% from buy</Text>
+          <View style={[styles.row, { marginTop: 10 }]}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>ETH max drawdown</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  value={slEthStr}
+                  onChangeText={setSlEthStr}
+                />
+                <Text style={styles.unit}>%</Text>
+              </View>
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>BTC max drawdown</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  value={slBtcStr}
+                  onChangeText={setSlBtcStr}
+                />
+                <Text style={styles.unit}>%</Text>
+              </View>
             </View>
           </View>
         ) : null}
@@ -194,7 +235,7 @@ export default function SimulationScreen() {
           <View style={{ flex: 1, marginRight: 12 }}>
             <Text style={styles.slLabel}>Reopen on dip</Text>
             <Text style={styles.slSub}>
-              When on, a closed row can open again if spot falls at least this % below the price at which it last sold.
+              When on, a closed leg can reopen if spot falls the ETH/BTC % below its last exit (uses exit USDC).
             </Text>
           </View>
           <Switch
@@ -205,16 +246,30 @@ export default function SimulationScreen() {
           />
         </View>
         {reopenEn ? (
-          <View style={styles.slPctRow}>
-            <Text style={styles.inputLabel}>Reopen if down</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                keyboardType="decimal-pad"
-                value={reopenStr}
-                onChangeText={setReopenStr}
-              />
-              <Text style={styles.unit}>% from last exit</Text>
+          <View style={[styles.row, { marginTop: 10 }]}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>ETH dip from exit</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  value={reopenEthStr}
+                  onChangeText={setReopenEthStr}
+                />
+                <Text style={styles.unit}>%</Text>
+              </View>
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>BTC dip from exit</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  value={reopenBtcStr}
+                  onChangeText={setReopenBtcStr}
+                />
+                <Text style={styles.unit}>%</Text>
+              </View>
             </View>
           </View>
         ) : null}
