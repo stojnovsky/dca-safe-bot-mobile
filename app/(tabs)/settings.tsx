@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, Alert, Switch,
+  StyleSheet, Alert, Switch, Share, Platform,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { getConfig, saveConfig, getPrivateKey, savePrivateKey } from '@/lib/config-store';
@@ -15,7 +15,9 @@ import {
   runDcaTaskNow,
 } from '@/tasks/dca-task';
 import * as BackgroundTask from 'expo-background-task';
+import * as Clipboard from 'expo-clipboard';
 import type { BotConfig } from '@/lib/types';
+import { exportPositionsToJson, importPositionsFromJson } from '@/lib/positions-export';
 
 function parsePos(v: string, fallback: number): number {
   const n = parseFloat(v);
@@ -98,6 +100,8 @@ export default function SettingsScreen() {
   const [triggering, setTriggering] = useState(false);
   const [saved,   setSaved]   = useState(false);
   const [safeInfo, setSafeInfo] = useState<{ owners: string[]; threshold: number } | null>(null);
+  const [positionsImportText, setPositionsImportText] = useState('');
+  const [positionsBusy, setPositionsBusy] = useState(false);
 
   useFocusEffect(useCallback(() => {
     (async () => {
@@ -174,6 +178,88 @@ export default function SettingsScreen() {
       Alert.alert('Background task error', String(e));
       setBotOn(!on);
     }
+  };
+
+  const exportPositionsBackup = async () => {
+    setPositionsBusy(true);
+    try {
+      const json = await exportPositionsToJson();
+      const meta = JSON.parse(json) as { positions?: unknown[]; usdcPositions?: unknown[] };
+      const nPos = meta.positions?.length ?? 0;
+      const nUsdc = meta.usdcPositions?.length ?? 0;
+      await Clipboard.setStringAsync(json);
+      Alert.alert(
+        'Copied to clipboard',
+        `${nPos} position(s) and ${nUsdc} USDC row(s). Paste into Notes or send to your other device, then use Import there.\n\nThis does not include your private key or Safe address — set those separately on the new device.`,
+      );
+    } catch (e) {
+      Alert.alert('Export failed', String(e));
+    } finally {
+      setPositionsBusy(false);
+    }
+  };
+
+  const sharePositionsBackup = async () => {
+    setPositionsBusy(true);
+    try {
+      const json = await exportPositionsToJson();
+      await Share.share({
+        message: json,
+        title: 'DCA positions backup',
+      });
+    } catch {
+      /* User cancelled the share sheet or share is unavailable */
+    } finally {
+      setPositionsBusy(false);
+    }
+  };
+
+  const pasteImportFromClipboard = async () => {
+    try {
+      const t = await Clipboard.getStringAsync();
+      setPositionsImportText(t ?? '');
+    } catch (e) {
+      Alert.alert('Clipboard', String(e));
+    }
+  };
+
+  const runPositionsImport = (mode: 'merge' | 'replace') => {
+    const raw = positionsImportText.trim();
+    if (!raw) {
+      Alert.alert('Nothing to import', 'Paste an export JSON string first (or use Paste from clipboard).');
+      return;
+    }
+    const title = mode === 'replace' ? 'Replace all positions?' : 'Merge positions?';
+    const message = mode === 'replace'
+      ? 'This removes every position and USDC leg stored on this device, then loads the backup. Use this when restoring on a new phone. This cannot be undone.'
+      : 'Rows whose IDs already exist are skipped. USDC rows are skipped if their linked position is missing.';
+
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: mode === 'replace' ? 'Replace' : 'Merge',
+        style: mode === 'replace' ? 'destructive' : 'default',
+        onPress: async () => {
+          setPositionsBusy(true);
+          try {
+            const r = await importPositionsFromJson(raw, mode);
+            if (mode === 'replace') {
+              Alert.alert('Import complete', `Loaded ${r.positionsImported} position(s) and ${r.usdcImported} USDC row(s).`);
+            } else {
+              Alert.alert(
+                'Import complete',
+                `Added ${r.positionsImported} position(s) (${r.positionsSkipped} skipped), ${r.usdcImported} USDC row(s) (${r.usdcSkipped} skipped).`,
+              );
+            }
+            setPositionsImportText('');
+          } catch (e) {
+            Alert.alert('Import failed', String(e));
+          } finally {
+            setPositionsBusy(false);
+          }
+        },
+      },
+    ]);
   };
 
   const runNow = async () => {
@@ -408,6 +494,62 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Positions backup (migrate to another device) */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Positions backup</Text>
+        <Text style={styles.toggleSub}>
+          Export copies your local position history (opens, closes, USDC legs) as JSON. On the new device, enter the same Safe and private key in Settings, then import the JSON here. Your keys are never included in the export.
+        </Text>
+        <View style={[styles.row, { marginTop: 12, flexWrap: 'wrap', gap: 8 }]}>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, styles.flexBtn]}
+            onPress={exportPositionsBackup}
+            disabled={positionsBusy}
+          >
+            <Text style={styles.secondaryBtnTxt}>{positionsBusy ? '…' : 'Copy export to clipboard'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, styles.flexBtn]}
+            onPress={sharePositionsBackup}
+            disabled={positionsBusy}
+          >
+            <Text style={styles.secondaryBtnTxt}>Share export…</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Import JSON</Text>
+        <Text style={styles.fieldSub}>Paste a backup from another device, then choose merge or replace.</Text>
+        <TextInput
+          style={styles.importInput}
+          value={positionsImportText}
+          onChangeText={setPositionsImportText}
+          placeholder='{"format":"dca-safe-positions-v1",…}'
+          placeholderTextColor="#4b5563"
+          multiline
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <View style={[styles.row, { marginTop: 8, flexWrap: 'wrap', gap: 8 }]}>
+          <TouchableOpacity style={[styles.secondaryBtn, styles.flexBtn]} onPress={pasteImportFromClipboard}>
+            <Text style={styles.secondaryBtnTxt}>Paste from clipboard</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, styles.flexBtn]}
+            onPress={() => runPositionsImport('merge')}
+            disabled={positionsBusy}
+          >
+            <Text style={styles.secondaryBtnTxt}>Import (merge)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, styles.flexBtn]}
+            onPress={() => runPositionsImport('replace')}
+            disabled={positionsBusy}
+          >
+            <Text style={[styles.secondaryBtnTxt, { color: '#f87171' }]}>Import (replace all)</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Display preferences */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Display</Text>
@@ -469,7 +611,22 @@ const styles = StyleSheet.create({
   fieldInput:    { backgroundColor: '#1f2937', color: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, borderWidth: 1, borderColor: '#374151' },
   monoInput:     { fontVariant: ['tabular-nums'], fontSize: 12 },
   row:           { flexDirection: 'row' },
+  flexBtn:       { flexGrow: 1, flexBasis: '45%', minWidth: 140 },
   secondaryBtn:  { backgroundColor: '#1f2937', borderRadius: 8, paddingVertical: 8, alignItems: 'center', marginTop: 4 },
+  importInput:   {
+    backgroundColor: '#0d1117',
+    color: '#e5e7eb',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 11,
+    fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }),
+    borderWidth: 1,
+    borderColor: '#374151',
+    minHeight: 100,
+    marginTop: 8,
+    textAlignVertical: 'top',
+  },
   secondaryBtnTxt: { color: '#9ca3af', fontSize: 13 },
   infoBox:       { backgroundColor: '#0d1117', borderRadius: 8, padding: 10, marginTop: 8 },
   infoTxt:       { color: '#10b981', fontSize: 12, marginBottom: 4 },
