@@ -4,9 +4,9 @@
 
 # MeditFin
 
-**A self-custodial DCA bot for ETH & BTC on Base — controlled entirely from your iPhone.**
+**A self-custodial DCA bot for ETH & BTC on Base — controlled from your phone (iOS & Android).**
 
-[![Platform](https://img.shields.io/badge/platform-iOS-000?logo=apple&logoColor=white)](https://developer.apple.com/ios)
+[![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-000?logo=android&logoColor=white)](https://reactnative.dev)
 [![Expo](https://img.shields.io/badge/Expo-SDK%2055-000?logo=expo&logoColor=white)](https://expo.dev)
 [![React Native](https://img.shields.io/badge/React%20Native-0.83-61DAFB?logo=react&logoColor=black)](https://reactnative.dev)
 [![Network](https://img.shields.io/badge/network-Base-0052FF?logo=coinbase&logoColor=white)](https://base.org)
@@ -17,9 +17,9 @@
 
 ## What is MeditFin?
 
-MeditFin is an iOS app that automates a **Dollar Cost Averaging (DCA)** strategy for ETH and BTC, using a **Safe (Gnosis Safe) multisig** wallet you own on the **Base** L2 network.
+MeditFin is a **React Native / Expo** app that automates a **Dollar Cost Averaging (DCA)** strategy for ETH and BTC, using a **Safe (Gnosis Safe) multisig** wallet you own on the **Base** L2 network.
 
-The app is fully self-custodial: your funds live in your Safe, the bot key is just a co-signer with no transfer rights of its own. The private key never leaves the iOS **Keychain (Secure Enclave)**.
+The app is fully self-custodial: your funds live in your Safe, the bot key is just a co-signer with no transfer rights of its own. The private key never leaves the device **secure storage** (iOS Keychain / Android Keystore-backed storage via `expo-secure-store`).
 
 It also ships with a **historical backtester** so you can tune your strategy against real ETH/BTC prices since 2022 before deploying any capital.
 
@@ -30,8 +30,8 @@ It also ships with a **historical backtester** so you can tune your strategy aga
 - **Self-custodial via Safe** — the app signs Safe transactions; your multisig holds the funds.
 - **On-chain swaps** — uses Uniswap V3 (`SwapRouter02`) on Base, batched through Safe's `MultiSend`.
 - **Backtester** — replay strategies on real CoinGecko price history (90 d → all-time).
-- **Keys stay on-device** — bot key and CoinGecko Pro key are stored in the iOS Keychain.
-- **No backend** — everything runs locally on your iPhone.
+- **Keys stay on-device** — bot key is stored with `expo-secure-store` (Keychain on iOS, Keystore-backed storage on Android).
+- **No backend** — everything runs locally on your phone.
 
 ---
 
@@ -59,7 +59,7 @@ It also ships with a **historical backtester** so you can tune your strategy aga
 ```
 ┌──────────────────┐   reads / signs   ┌──────────────────┐
 │   MeditFin app   │ ────────────────► │  Safe (Base L2)  │
-│  (iOS, on-device)│                   │  holds USDC/ETH  │
+│ (iOS / Android)  │                   │  holds USDC/ETH  │
 └────────┬─────────┘                   │  /cbBTC funds    │
          │                             └────────┬─────────┘
          │ hourly                               │ executes
@@ -116,11 +116,18 @@ Configure in **Settings**:
 
 ### Prerequisites
 
+**iOS**
+
 - macOS with **Xcode 16+** ([App Store](https://apps.apple.com/app/xcode/id497799835))
 - **Node 20+** and **npm**
 - **CocoaPods** (`brew install cocoapods`)
 - An iPhone (for sideloading) **or** an iOS Simulator runtime installed via Xcode → Settings → Platforms
 - A free Apple ID (for sideloading on a real device)
+
+**Android** (local builds)
+
+- **Node 20+** and **npm**
+- **JDK 17**, **Android Studio**, Android SDK (API 35) — see **[docs/ANDROID_BUILD.md](docs/ANDROID_BUILD.md)** for the full checklist
 
 ### 1. Install dependencies
 
@@ -152,7 +159,16 @@ npm run ios-device
 
 For a full walk-through of free 7-day sideloading and AltStore-based auto-refresh, see **[docs/sideloading.md](docs/sideloading.md)**.
 
-### 4. Configure the bot (in-app)
+### 4. Android (emulator or device)
+
+```bash
+npm run prebuild:android   # generates ./android (gitignored)
+npm run android            # debug build + install
+```
+
+Release / Play Store builds use **EAS** — step-by-step guide: **[docs/ANDROID_BUILD.md](docs/ANDROID_BUILD.md)**.
+
+### 5. Configure the bot (in-app)
 
 Open the **Settings** tab and fill in:
 
@@ -184,13 +200,14 @@ Tap **Verify Safe on-chain** to confirm the app can read your Safe's owners and 
 │   ├── swap.ts           # Uniswap V3 routes
 │   ├── position-store.ts # SQLite CRUD for positions
 │   ├── price-store.ts    # CoinGecko price cache
-│   ├── config-store.ts   # SecureStore + Keychain
+│   ├── config-store.ts   # SecureStore (iOS / Android)
 │   ├── constants.ts      # Addresses, ABIs, RPC defaults
 │   └── db.ts             # SQLite bootstrap
 ├── tasks/
 │   └── dca-task.ts       # expo-background-task registration
 ├── docs/
-│   └── sideloading.md
+│   ├── sideloading.md
+│   └── ANDROID_BUILD.md  # Android & EAS build guide
 └── assets/readme/        # README screenshots & logo
 ```
 
@@ -204,7 +221,12 @@ Tap **Verify Safe on-chain** to confirm the app can read your Safe's owners and 
 | `npm run ios` | Build & run on iOS Simulator |
 | `npm run ios-device` | Build & run on a connected iPhone |
 | `npm run ios-install-pod` | `pod install` inside `ios/` |
+| `npm run prebuild:android` | Generate `android/` from `app.json` (local) |
+| `npm run android` | Build & run on Android emulator / default device |
+| `npm run android-device` | Build & run on a selected USB device |
 | `npm run build` | EAS build for iOS (requires `eas login`) |
+| `npm run build:android` | EAS production Android **.aab** (Play Store) |
+| `npm run build:all` | EAS build iOS + Android |
 
 ---
 
@@ -212,7 +234,7 @@ Tap **Verify Safe on-chain** to confirm the app can read your Safe's owners and 
 
 - **Disclaimer:** This product was **vibe coded** (AI-assisted, iterative development). It is offered **without warranty** of any kind and **as-is**. Do not deploy capital you cannot afford to lose; audit and test yourself before mainnet use.
 - The **bot key is a Safe co-owner**, not the only owner. Use a multi-owner / threshold setup so a compromised iPhone can't drain your funds.
-- The bot key is written to `expo-secure-store`, which on iOS maps to the **Keychain** (Secure Enclave-backed when available). It is never logged, exported, or sent off-device.
+- The bot key is written to `expo-secure-store` (Keychain on iOS; Android Keystore-backed encrypted storage). It is never logged, exported, or sent off-device.
 - Free Apple ID provisioning expires every **7 days** — see the sideloading guide for refresh strategies.
 - This project is **experimental software**. Audit the code before deploying any non-trivial capital.
 
@@ -220,7 +242,6 @@ Tap **Verify Safe on-chain** to confirm the app can read your Safe's owners and 
 
 ## Roadmap ideas
 
-- [ ] Android target
 - [ ] Push notifications on each DCA run
 - [ ] Multiple strategies / per-asset profit thresholds
 - [ ] On-chain trade history view with Basescan deep-links

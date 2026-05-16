@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import CoinPile from './CoinPile';
 import DailyCoin from './DailyCoin';
+import PositionFilterChips from './PositionFilterChips';
 import type { CryptoPosition, PositionLifecycleEvent } from '@/lib/types';
+import { matchesPositionViewFilter, type PositionsViewFilter } from '@/lib/position-filters';
 import {
   flattenMonthPositions,
   flattenYearPositions,
@@ -26,21 +28,11 @@ const ROW_GAP = 6;
 // → weeks** (Mon–Sun). Each column is a **pile**; tapping a **week** pile/header
 // opens a **week-only** coin grid (no pile mixed with singles).
 
-type CoinFilter = 'all' | 'open' | 'closed' | 'profit' | 'loss';
-
 type Drill =
   | { level: 'years' }
   | { level: 'months'; year: number }
   | { level: 'weeks'; year: number; monthKey: string }
   | { level: 'weekCoins'; year: number; monthKey: string; weekKey: string };
-
-const FILTERS: { key: CoinFilter; label: string }[] = [
-  { key: 'all',    label: 'All'    },
-  { key: 'open',   label: 'Open'   },
-  { key: 'closed', label: 'Closed' },
-  { key: 'profit', label: 'Profit' },
-  { key: 'loss',   label: 'Loss'   },
-];
 
 /** Max height of the week-only coin list (final step). */
 const WEEK_COINS_SCROLL_MAX_H = 480;
@@ -71,7 +63,7 @@ function fmtLifecycle(ev: PositionLifecycleEvent): string {
 
 export default function CoinVault({ positions }: Props) {
   const { width: windowWidth } = useWindowDimensions();
-  const [filter, setFilter] = useState<CoinFilter>('all');
+  const [filter, setFilter] = useState<PositionsViewFilter>('all');
   const [drill, setDrill]   = useState<Drill>({ level: 'years' });
   const [innerW, setInnerW] = useState(0);
 
@@ -86,21 +78,22 @@ export default function CoinVault({ positions }: Props) {
     return { open, closed };
   }, [positions]);
 
-  const filtered = useMemo(() => {
-    return sorted.filter((p) => {
-      const isOpen = p.status === 'OPEN';
-      const pnl    = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
-      switch (filter) {
-        case 'open':   return isOpen;
-        case 'closed': return !isOpen;
-        case 'profit': return pnl >= 0;
-        case 'loss':
-          if (isOpen) return pnl < 0;
-          return (p.profitPct ?? 0) < 0 || p.closeReason === 'stop_loss';
-        default:       return true;
-      }
-    });
-  }, [sorted, filter]);
+  const filtered = useMemo(
+    () =>
+      sorted.filter((p) =>
+        matchesPositionViewFilter(
+          {
+            status: p.status,
+            profitPct: p.profitPct,
+            unrealizedPnlPct: p.unrealizedPnlPct,
+            closeReason: p.closeReason,
+            lifecycle: p.lifecycle,
+          },
+          filter,
+        ),
+      ),
+    [sorted, filter],
+  );
 
   const grouped = useMemo(() => groupPositionsByYMW(filtered), [filtered]);
 
@@ -204,17 +197,7 @@ export default function CoinVault({ positions }: Props) {
         <Legend swatch="#fecaca" border="#991b1b" label="Live · down" />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.key}
-            onPress={() => setFilter(f.key)}
-            style={[styles.filterBtn, filter === f.key && styles.filterBtnActive]}
-          >
-            <Text style={[styles.filterTxt, filter === f.key && styles.filterTxtActive]}>{f.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <PositionFilterChips value={filter} onChange={setFilter} />
 
       {filtered.length === 0 ? (
         <Text style={styles.vaultEmpty}>No coins match this filter.</Text>
@@ -463,9 +446,4 @@ const styles = StyleSheet.create({
   legendSwatch:{ width: 12, height: 12, borderRadius: 6, borderWidth: 1 },
   legendTxt:   { color: '#9ca3af', fontSize: 10, fontWeight: '500' },
 
-  filterRow:        { flexGrow: 0, marginBottom: 12 },
-  filterBtn:        { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: '#1f2937', marginRight: 6 },
-  filterBtnActive:  { backgroundColor: '#2563eb' },
-  filterTxt:        { color: '#9ca3af', fontSize: 11, fontWeight: '600' },
-  filterTxtActive:  { color: '#fff' },
 });

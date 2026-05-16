@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, StyleSheet, Alert, Linking,
@@ -17,6 +17,13 @@ import type { BotConfig, CryptoPosition } from '@/lib/types';
 import StatCard from '@/components/StatCard';
 import PortfolioChart, { type ChartPoint } from '@/components/PortfolioChart';
 import CoinVault from '@/components/CoinVault';
+import CollapsibleDcaStrategyPanel from '@/components/CollapsibleDcaStrategyPanel';
+import PositionFilterChips from '@/components/PositionFilterChips';
+import {
+  matchesPositionViewFilter,
+  type PositionFilterFields,
+  type PositionsViewFilter,
+} from '@/lib/position-filters';
 
 function fmt(n: number, d = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -44,6 +51,23 @@ async function readBalance(safeAddress: `0x${string}`, rpcUrl: string): Promise<
     usdcInSafe:  parseFloat(formatUnits(usdcRaw as bigint,   6)),
     ethPrice:    priceRes.ethereum.usd,
     btcPrice:    priceRes.bitcoin.usd,
+  };
+}
+
+function portfolioRowFilterFields(
+  p: Awaited<ReturnType<typeof getAllPositions>>[number],
+  ethPrice: number,
+  btcPrice: number,
+): PositionFilterFields {
+  const price = p.asset === 'ETH' ? ethPrice : btcPrice;
+  const unrealizedPnlPct =
+    p.status === 'OPEN' && price > 0 ? ((price - p.buyPrice) / p.buyPrice) * 100 : undefined;
+  return {
+    status: p.status,
+    profitPct: p.profitPct,
+    unrealizedPnlPct,
+    closeReason: p.closeReason,
+    lifecycle: p.lifecycle,
   };
 }
 
@@ -95,6 +119,7 @@ export default function PortfolioScreen() {
   const [running,    setRunning]    = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [timeline,   setTimeline]   = useState<ChartPoint[]>([]);
+  const [positionFilter, setPositionFilter] = useState<PositionsViewFilter>('all');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -199,6 +224,14 @@ export default function PortfolioScreen() {
   const ethPrice      = live?.ethPrice ?? 0;
   const btcPrice      = live?.btcPrice ?? 0;
 
+  const filteredPortfolioPositions = useMemo(
+    () =>
+      positions.filter((p) =>
+        matchesPositionViewFilter(portfolioRowFilterFields(p, ethPrice, btcPrice), positionFilter),
+      ),
+    [positions, ethPrice, btcPrice, positionFilter],
+  );
+
   const netWorth = live
     ? live.wethInSafe * ethPrice + live.cbBtcInSafe * btcPrice + live.usdcInSafe
     : 0;
@@ -215,7 +248,11 @@ export default function PortfolioScreen() {
   const deployedPnlPct = openCostBasis > 0 ? (deployedPnlUsd / openCostBasis) * 100 : 0;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -228,6 +265,10 @@ export default function PortfolioScreen() {
           <Text style={styles.refreshTxt}>{loading ? '…' : 'Refresh'}</Text>
         </TouchableOpacity>
       </View>
+
+      {config && config.safeAddress ? (
+        <CollapsibleDcaStrategyPanel botConfig={config} onSaved={refresh} />
+      ) : null}
 
       {/* Stat cards */}
       {live && (
@@ -284,8 +325,17 @@ export default function PortfolioScreen() {
         <CoinVault positions={positions.map((p) => enrichForVault(p, ethPrice, btcPrice))} />
       ) : (
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Positions ({positions.length})</Text>
-          {positions.map((p) => {
+          <Text style={styles.sectionLabel}>
+            Positions ({filteredPortfolioPositions.length}
+            {positionFilter !== 'all' && positions.length !== filteredPortfolioPositions.length
+              ? ` / ${positions.length}`
+              : ''})
+          </Text>
+          <PositionFilterChips value={positionFilter} onChange={setPositionFilter} />
+          {filteredPortfolioPositions.length === 0 ? (
+            <Text style={styles.empty}>No positions match this filter.</Text>
+          ) : (
+            filteredPortfolioPositions.map((p) => {
             const price    = p.asset === 'ETH' ? ethPrice : btcPrice;
             const currVal  = p.status === 'OPEN' ? p.assetAmount * price : (p.usdcReceived ?? 0);
             const pnlPct   = p.status === 'OPEN'
@@ -320,7 +370,8 @@ export default function PortfolioScreen() {
                 </TouchableOpacity>
               </View>
             );
-          })}
+          })
+          )}
         </View>
       )}
     </ScrollView>

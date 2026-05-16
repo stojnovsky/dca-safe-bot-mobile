@@ -12,6 +12,8 @@ import type { SimulationResult, BacktestConfig, CryptoPosition } from '@/lib/typ
 import PortfolioChart, { type ChartPoint } from '@/components/PortfolioChart';
 import StatCard from '@/components/StatCard';
 import CoinVault from '@/components/CoinVault';
+import PositionFilterChips from '@/components/PositionFilterChips';
+import { matchesPositionViewFilter, type PositionsViewFilter } from '@/lib/position-filters';
 
 const PERIODS = [
   { label: '90d',  days: 90   },
@@ -390,17 +392,41 @@ function PositionsTable({
   openCount:   number;
   closedCount: number;
 }) {
+  const [filter, setFilter] = React.useState<PositionsViewFilter>('all');
   const sorted = React.useMemo(
     () => [...positions].sort((a, b) => b.buyDate.localeCompare(a.buyDate)),
     [positions],
   );
+  const filtered = React.useMemo(
+    () =>
+      sorted.filter((p) =>
+        matchesPositionViewFilter(
+          {
+            status: p.status,
+            profitPct: p.profitPct,
+            unrealizedPnlPct: p.unrealizedPnlPct,
+            closeReason: p.closeReason,
+            lifecycle: p.lifecycle,
+          },
+          filter,
+        ),
+      ),
+    [sorted, filter],
+  );
   return (
     <View style={styles.tableCard}>
       <View style={styles.tableHead}>
-        <Text style={styles.sectionLabel}>Positions ({positions.length})</Text>
+        <Text style={styles.sectionLabel}>
+          Positions ({filtered.length}
+          {filter !== 'all' && positions.length !== filtered.length ? ` / ${positions.length}` : ''})
+        </Text>
         <Text style={styles.tableSub}>{openCount} open · {closedCount} closed</Text>
       </View>
-      {sorted.map((p) => {
+      <PositionFilterChips value={filter} onChange={setFilter} />
+      {filtered.length === 0 ? (
+        <Text style={styles.tableEmpty}>No positions match this filter.</Text>
+      ) : (
+        filtered.map((p) => {
         const isOpen   = p.status === 'OPEN';
         const currVal  = isOpen ? (p.finalValue ?? 0) : (p.usdcReceived ?? 0);
         const pnlPct   = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
@@ -429,7 +455,8 @@ function PositionsTable({
             </View>
           </View>
         );
-      })}
+        })
+      )}
     </View>
   );
 }
@@ -466,6 +493,7 @@ const styles = StyleSheet.create({
 
   tableCard:   { backgroundColor: '#111827', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#1f2937', marginBottom: 12 },
   tableHead:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
+  tableEmpty:  { color: '#6b7280', fontSize: 13, paddingVertical: 16, textAlign: 'center' },
   tableSub:    { fontSize: 11, color: '#6b7280' },
   tableRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#1f2937' },
   tableAsset:  { fontSize: 13, fontWeight: '600', color: '#fff' },
