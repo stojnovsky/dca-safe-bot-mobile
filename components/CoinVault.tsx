@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import CoinPile from './CoinPile';
 import DailyCoin from './DailyCoin';
-import type { CryptoPosition } from '@/lib/types';
+import PositionFilterChips from './PositionFilterChips';
+import type { CryptoPosition, PositionLifecycleEvent } from '@/lib/types';
+import { matchesPositionViewFilter, type PositionsViewFilter } from '@/lib/position-filters';
 import {
   flattenMonthPositions,
   flattenYearPositions,
@@ -26,21 +28,11 @@ const ROW_GAP = 6;
 // → weeks** (Mon–Sun). Each column is a **pile**; tapping a **week** pile/header
 // opens a **week-only** coin grid (no pile mixed with singles).
 
-type CoinFilter = 'all' | 'open' | 'closed' | 'profit' | 'loss';
-
 type Drill =
   | { level: 'years' }
   | { level: 'months'; year: number }
   | { level: 'weeks'; year: number; monthKey: string }
   | { level: 'weekCoins'; year: number; monthKey: string; weekKey: string };
-
-const FILTERS: { key: CoinFilter; label: string }[] = [
-  { key: 'all',    label: 'All'    },
-  { key: 'open',   label: 'Open'   },
-  { key: 'closed', label: 'Closed' },
-  { key: 'profit', label: 'Profit' },
-  { key: 'loss',   label: 'Loss'   },
-];
 
 /** Max height of the week-only coin list (final step). */
 const WEEK_COINS_SCROLL_MAX_H = 480;
@@ -51,11 +43,29 @@ function fmt(n: number, d = 2): string {
 
 interface Props {
   positions: CryptoPosition[];
+  /** When set, tapping an **open** coin shows a "Close now" action (on-chain sell at spot). */
+  onRequestCloseOpen?: (p: CryptoPosition) => void;
 }
 
-export default function CoinVault({ positions }: Props) {
+function fmtLifecycle(ev: PositionLifecycleEvent): string {
+  const px = `$${fmt(ev.price, 0)}`;
+  if (ev.action === 'open') {
+    return `${ev.date}  ·  Open @ ${px}  ·  $${fmt(ev.usdcInvested ?? 0)} in  ·  ${fmt(ev.assetAmount ?? 0, 6)} units`;
+  }
+  if (ev.action === 'reopen') {
+    return `${ev.date}  ·  Reopen @ ${px}  ·  $${fmt(ev.usdcInvested ?? 0)} in  ·  ${fmt(ev.assetAmount ?? 0, 6)} units`;
+  }
+  if (ev.action === 'close_take_profit') {
+    const pp = ev.profitPct ?? 0;
+    return `${ev.date}  ·  Close (take-profit) @ ${px}  ·  ${pp >= 0 ? '+' : ''}${fmt(pp)}%  ·  $${fmt(ev.usdcReceived ?? 0)} out`;
+  }
+  const pp = ev.profitPct ?? 0;
+  return `${ev.date}  ·  Close (stop-loss) @ ${px}  ·  ${fmt(pp)}%  ·  $${fmt(ev.usdcReceived ?? 0)} out`;
+}
+
+export default function CoinVault({ positions, onRequestCloseOpen }: Props) {
   const { width: windowWidth } = useWindowDimensions();
-  const [filter, setFilter] = useState<CoinFilter>('all');
+  const [filter, setFilter] = useState<PositionsViewFilter>('all');
   const [drill, setDrill]   = useState<Drill>({ level: 'years' });
   const [innerW, setInnerW] = useState(0);
 
@@ -70,19 +80,22 @@ export default function CoinVault({ positions }: Props) {
     return { open, closed };
   }, [positions]);
 
-  const filtered = useMemo(() => {
-    return sorted.filter((p) => {
-      const isOpen = p.status === 'OPEN';
-      const pnl    = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
-      switch (filter) {
-        case 'open':   return isOpen;
-        case 'closed': return !isOpen;
-        case 'profit': return pnl >= 0;
-        case 'loss':   return pnl <  0;
-        default:       return true;
-      }
-    });
-  }, [sorted, filter]);
+  const filtered = useMemo(
+    () =>
+      sorted.filter((p) =>
+        matchesPositionViewFilter(
+          {
+            status: p.status,
+            profitPct: p.profitPct,
+            unrealizedPnlPct: p.unrealizedPnlPct,
+            closeReason: p.closeReason,
+            lifecycle: p.lifecycle,
+          },
+          filter,
+        ),
+      ),
+    [sorted, filter],
+  );
 
   const grouped = useMemo(() => groupPositionsByYMW(filtered), [filtered]);
 
@@ -130,6 +143,8 @@ export default function CoinVault({ positions }: Props) {
     const refPrice = isOpen ? (p.finalPrice ?? p.buyPrice) : (p.sellPrice ?? p.buyPrice);
     const lines = [
       `${p.asset}  ·  ${p.status}`,
+      ...(!isOpen && p.closeReason === 'stop_loss' ? ['Exit: stop-loss'] : []),
+      ...(!isOpen && p.closeReason === 'take_profit' ? ['Exit: take-profit'] : []),
       `Bought ${p.buyDate} @ $${fmt(p.buyPrice, 0)}`,
       isOpen
         ? `Now    @ $${fmt(refPrice, 0)}`
@@ -139,8 +154,21 @@ export default function CoinVault({ positions }: Props) {
       `Value:    $${fmt(value)}`,
       `P&L:      ${pnlPct >= 0 ? '+' : ''}$${fmt(pnlUsd)} (${pnlPct >= 0 ? '+' : ''}${fmt(pnlPct)}%)`,
     ];
-    Alert.alert('Daily Coin', lines.join('\n'));
-  }, []);
+    const lifeLines =
+      p.lifecycle && p.lifecycle.length > 0
+        ? ['', '— Activity (opens / closes / reopens) —', ...p.lifecycle.map(fmtLifecycle)]
+        : [];
+    const body = [...lines, ...lifeLines].join('\n');
+
+    if (isOpen && onRequestCloseOpen) {
+      Alert.alert('Daily Coin', body, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Close now', style: 'destructive', onPress: () => onRequestCloseOpen(p) },
+      ]);
+    } else {
+      Alert.alert('Daily Coin', body);
+    }
+  }, [onRequestCloseOpen]);
 
   const drillHint =
     drill.level === 'years'
@@ -170,27 +198,18 @@ export default function CoinVault({ positions }: Props) {
         <Text style={styles.sectionLabel}>Daily Coins ({positions.length})</Text>
         <Text style={styles.vaultSub}>
           {counts.open} open · {counts.closed} closed
+          {onRequestCloseOpen ? ' · live: tap → Close now' : ''}
         </Text>
       </View>
 
       <View style={styles.legendRow}>
         <Legend swatch="#fbbf24" border="#78350f" label="Gold · win" />
-        <Legend swatch="#a16207" border="#451a03" label="Bronze · loss" />
+        <Legend swatch="#a16207" border="#451a03" label="Bronze · loss / stop-loss" />
         <Legend swatch="#bbf7d0" border="#166534" label="Live · earning" />
         <Legend swatch="#fecaca" border="#991b1b" label="Live · down" />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.key}
-            onPress={() => setFilter(f.key)}
-            style={[styles.filterBtn, filter === f.key && styles.filterBtnActive]}
-          >
-            <Text style={[styles.filterTxt, filter === f.key && styles.filterTxtActive]}>{f.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <PositionFilterChips value={filter} onChange={setFilter} />
 
       {filtered.length === 0 ? (
         <Text style={styles.vaultEmpty}>No coins match this filter.</Text>
@@ -439,9 +458,4 @@ const styles = StyleSheet.create({
   legendSwatch:{ width: 12, height: 12, borderRadius: 6, borderWidth: 1 },
   legendTxt:   { color: '#9ca3af', fontSize: 10, fontWeight: '500' },
 
-  filterRow:        { flexGrow: 0, marginBottom: 12 },
-  filterBtn:        { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: '#1f2937', marginRight: 6 },
-  filterBtnActive:  { backgroundColor: '#2563eb' },
-  filterTxt:        { color: '#9ca3af', fontSize: 11, fontWeight: '600' },
-  filterTxtActive:  { color: '#fff' },
 });

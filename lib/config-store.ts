@@ -28,7 +28,14 @@ const DEFAULT_CONFIG: BotConfig = {
   pricesApiUrl:    DEFAULT_PRICES_API_URL,
   dailyAmountEth:  5,
   dailyAmountBtc:  5,
-  profitThreshold: 5,
+  profitThresholdEth: 5,
+  profitThresholdBtc: 5,
+  stopLossEnabled: false,
+  stopLossPctEth:  10,
+  stopLossPctBtc:  10,
+  reopenEnabled:   false,
+  reopenDownPctEth: 5,
+  reopenDownPctBtc: 5,
   showLogsTab:     false,
   gamifyPositions: true,
 };
@@ -63,7 +70,28 @@ export async function getConfig(): Promise<BotConfig> {
   try {
     const raw = await AsyncStorage.getItem(CONFIG_KEY);
     if (!raw) return DEFAULT_CONFIG;
-    return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const merged: BotConfig = { ...DEFAULT_CONFIG, ...parsed } as BotConfig;
+
+    const pt = parsed.profitThreshold;
+    if (typeof pt === 'number' && parsed.profitThresholdEth === undefined && parsed.profitThresholdBtc === undefined) {
+      merged.profitThresholdEth = pt;
+      merged.profitThresholdBtc = pt;
+    }
+
+    const sl = parsed.stopLossPct;
+    if (typeof sl === 'number' && parsed.stopLossPctEth === undefined && parsed.stopLossPctBtc === undefined) {
+      merged.stopLossPctEth = sl;
+      merged.stopLossPctBtc = sl;
+    }
+
+    const ro = parsed.reopenDownPct;
+    if (typeof ro === 'number' && parsed.reopenDownPctEth === undefined && parsed.reopenDownPctBtc === undefined) {
+      merged.reopenDownPctEth = ro;
+      merged.reopenDownPctBtc = ro;
+    }
+
+    return merged;
   } catch {
     return DEFAULT_CONFIG;
   }

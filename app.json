@@ -6,7 +6,8 @@
     "scheme": "dcabot",
     "icon": "./assets/icon.png",
     "platforms": [
-      "ios"
+      "ios",
+      "android"
     ],
     "ios": {
       "bundleIdentifier": "com.dcasafebot.app",
@@ -27,6 +28,14 @@
         }
       }
     },
+    "android": {
+      "package": "com.dcasafebot.app",
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#030712"
+      }
+    },
     "plugins": [
       "expo-router",
       "expo-background-task",
@@ -36,6 +45,11 @@
           "ios": {
             "deploymentTarget": "16.0",
             "buildReactNativeFromSource": true
+          },
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "minSdkVersion": 26
           }
         }
       ]

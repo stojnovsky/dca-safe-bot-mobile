@@ -1,17 +1,20 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, StyleSheet, Alert,
+  ActivityIndicator, StyleSheet, Alert, Switch,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { runSimulation } from '@/lib/dca-engine';
 import { getPricesForRange, seedAllPrices, getPriceCoverage } from '@/lib/price-store';
 import { useConfig } from '@/lib/config-store';
 import { HISTORY_START } from '@/lib/constants';
+import { localCalendarDate } from '@/lib/calendar-day';
 import type { SimulationResult, BacktestConfig, CryptoPosition } from '@/lib/types';
 import PortfolioChart, { type ChartPoint } from '@/components/PortfolioChart';
 import StatCard from '@/components/StatCard';
 import CoinVault from '@/components/CoinVault';
+import PositionFilterChips from '@/components/PositionFilterChips';
+import { matchesPositionViewFilter, type PositionsViewFilter } from '@/lib/position-filters';
 
 const PERIODS = [
   { label: '90d',  days: 90   },
@@ -27,8 +30,28 @@ function fmt(n: number, d = 2): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
+function parsePos(v: string, fallback: number): number {
+  const n = parseFloat(v);
+  return !isNaN(n) && n > 0 ? n : fallback;
+}
+
+/** Allow 0 to skip stop-loss / reopen for one asset, or 0% take-profit threshold. */
+function parseNonNeg(v: string, fallback: number): number {
+  const n = parseFloat(v);
+  return !isNaN(n) && n >= 0 ? n : fallback;
+}
+
 export default function SimulationScreen() {
-  const [config, setConfig]   = useState<BacktestConfig>({ dailyAmountEth: 5, dailyAmountBtc: 5, profitThreshold: 5 });
+  const [ethStr, setEthStr]       = useState('5');
+  const [btcStr, setBtcStr]       = useState('5');
+  const [profitEthStr, setProfitEthStr] = useState('5');
+  const [profitBtcStr, setProfitBtcStr] = useState('5');
+  const [slEn, setSlEn]           = useState(false);
+  const [slEthStr, setSlEthStr]   = useState('10');
+  const [slBtcStr, setSlBtcStr]   = useState('10');
+  const [reopenEn, setReopenEn]   = useState(false);
+  const [reopenEthStr, setReopenEthStr] = useState('5');
+  const [reopenBtcStr, setReopenBtcStr] = useState('5');
   const [period, setPeriod]   = useState(365);
   const prefs = useConfig();
   const gamify = prefs?.gamifyPositions !== false;
@@ -37,6 +60,22 @@ export default function SimulationScreen() {
   const [seeding, setSeeding] = useState(false);
   const [coverage, setCoverage] = useState<{ from: string | null; count: number } | null>(null);
 
+  const backtest = useMemo((): BacktestConfig => ({
+    dailyAmountEth:       parsePos(ethStr, 5),
+    dailyAmountBtc:       parsePos(btcStr, 5),
+    profitThresholdEth:   parseNonNeg(profitEthStr, 5),
+    profitThresholdBtc:   parseNonNeg(profitBtcStr, 5),
+    stopLossEnabled:      slEn,
+    stopLossPctEth:       parseNonNeg(slEthStr, 10),
+    stopLossPctBtc:       parseNonNeg(slBtcStr, 10),
+    reopenEnabled:        reopenEn,
+    reopenDownPctEth:     parseNonNeg(reopenEthStr, 5),
+    reopenDownPctBtc:     parseNonNeg(reopenBtcStr, 5),
+  }), [ethStr, btcStr, profitEthStr, profitBtcStr, slEn, slEthStr, slBtcStr, reopenEn, reopenEthStr, reopenBtcStr]);
+
+  const backtestRef = useRef(backtest);
+  backtestRef.current = backtest;
+
   const loadCoverage = useCallback(async () => {
     try {
       const cov = await getPriceCoverage();
@@ -44,15 +83,10 @@ export default function SimulationScreen() {
     } catch { /* ignore */ }
   }, []);
 
-  useFocusEffect(useCallback(() => {
-    loadCoverage();
-    runSim(period, config);
-  }, [])); // eslint-disable-line
-
   const runSim = useCallback(async (days: number, cfg: BacktestConfig) => {
     setLoading(true);
     try {
-      const today    = new Date().toISOString().slice(0, 10);
+      const today    = localCalendarDate();
       const fromDay  = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
       const fromDate = fromDay < HISTORY_START ? HISTORY_START : fromDay;
 
@@ -74,13 +108,18 @@ export default function SimulationScreen() {
     }
   }, []);
 
+  useFocusEffect(useCallback(() => {
+    loadCoverage();
+    runSim(period, backtestRef.current);
+  }, [period, loadCoverage, runSim]));
+
   const syncHistory = async () => {
     setSeeding(true);
     try {
       const counts = await seedAllPrices(HISTORY_START);
       await loadCoverage();
       Alert.alert('Done', `Synced ${counts.ethereum} ETH + ${counts.bitcoin} BTC price records.`);
-      runSim(period, config);
+      runSim(period, backtest);
     } catch (e) {
       Alert.alert('Sync failed', String(e));
     } finally {
@@ -99,31 +138,148 @@ export default function SimulationScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionLabel}>Strategy Parameters</Text>
         <View style={styles.row}>
-          {[
-            { key: 'dailyAmountEth',  label: 'ETH buy/day',  unit: 'USDC' },
-            { key: 'dailyAmountBtc',  label: 'BTC buy/day',  unit: 'USDC' },
-            { key: 'profitThreshold', label: 'Sell at',       unit: '%' },
-          ].map(({ key, label, unit }) => (
-            <View key={key} style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>{label}</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>ETH buy/day</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={ethStr}
+                onChangeText={setEthStr}
+              />
+              <Text style={styles.unit}>USDC</Text>
+            </View>
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>BTC buy/day</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={btcStr}
+                onChangeText={setBtcStr}
+              />
+              <Text style={styles.unit}>USDC</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.row, { marginTop: 10 }]}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Sell ETH at +%</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={profitEthStr}
+                onChangeText={setProfitEthStr}
+              />
+              <Text style={styles.unit}>%</Text>
+            </View>
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Sell BTC at +%</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={profitBtcStr}
+                onChangeText={setProfitBtcStr}
+              />
+              <Text style={styles.unit}>%</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.slRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.slLabel}>Stop-loss</Text>
+            <Text style={styles.slSub}>
+              When on, sell if down the ETH/BTC % from buy (after take-profit). Set 0 on one side to skip that asset.
+            </Text>
+          </View>
+          <Switch
+            value={slEn}
+            onValueChange={setSlEn}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
+        </View>
+        {slEn ? (
+          <View style={[styles.row, { marginTop: 10 }]}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>ETH max drawdown</Text>
               <View style={styles.inputRow}>
                 <TextInput
                   style={styles.input}
-                  keyboardType="numeric"
-                  value={String(config[key as keyof BacktestConfig])}
-                  onChangeText={(v) => {
-                    const n = parseFloat(v);
-                    if (!isNaN(n) && n > 0) setConfig((c) => ({ ...c, [key]: n }));
-                  }}
+                  keyboardType="decimal-pad"
+                  value={slEthStr}
+                  onChangeText={setSlEthStr}
                 />
-                <Text style={styles.unit}>{unit}</Text>
+                <Text style={styles.unit}>%</Text>
               </View>
             </View>
-          ))}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>BTC max drawdown</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  value={slBtcStr}
+                  onChangeText={setSlBtcStr}
+                />
+                <Text style={styles.unit}>%</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.slRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.slLabel}>Reopen on dip</Text>
+            <Text style={styles.slSub}>
+              When on, a closed leg can reopen if spot falls the ETH/BTC % below its last exit (uses exit USDC).
+            </Text>
+          </View>
+          <Switch
+            value={reopenEn}
+            onValueChange={setReopenEn}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
         </View>
+        {reopenEn ? (
+          <View style={[styles.row, { marginTop: 10 }]}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>ETH dip from exit</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  value={reopenEthStr}
+                  onChangeText={setReopenEthStr}
+                />
+                <Text style={styles.unit}>%</Text>
+              </View>
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>BTC dip from exit</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  value={reopenBtcStr}
+                  onChangeText={setReopenBtcStr}
+                />
+                <Text style={styles.unit}>%</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
         <TouchableOpacity
           style={styles.btn}
-          onPress={() => runSim(period, config)}
+          onPress={() => runSim(period, backtest)}
           disabled={loading}
         >
           <Text style={styles.btnText}>{loading ? 'Running…' : 'Run Simulation'}</Text>
@@ -137,7 +293,7 @@ export default function SimulationScreen() {
             <TouchableOpacity
               key={days}
               style={[styles.periodBtn, period === days && styles.periodBtnActive]}
-              onPress={() => { setPeriod(days); runSim(days, config); }}
+              onPress={() => { setPeriod(days); runSim(days, backtest); }}
             >
               <Text style={[styles.periodLabel, period === days && styles.periodLabelActive]}>
                 {label}
@@ -237,17 +393,41 @@ function PositionsTable({
   openCount:   number;
   closedCount: number;
 }) {
+  const [filter, setFilter] = React.useState<PositionsViewFilter>('all');
   const sorted = React.useMemo(
     () => [...positions].sort((a, b) => b.buyDate.localeCompare(a.buyDate)),
     [positions],
   );
+  const filtered = React.useMemo(
+    () =>
+      sorted.filter((p) =>
+        matchesPositionViewFilter(
+          {
+            status: p.status,
+            profitPct: p.profitPct,
+            unrealizedPnlPct: p.unrealizedPnlPct,
+            closeReason: p.closeReason,
+            lifecycle: p.lifecycle,
+          },
+          filter,
+        ),
+      ),
+    [sorted, filter],
+  );
   return (
     <View style={styles.tableCard}>
       <View style={styles.tableHead}>
-        <Text style={styles.sectionLabel}>Positions ({positions.length})</Text>
+        <Text style={styles.sectionLabel}>
+          Positions ({filtered.length}
+          {filter !== 'all' && positions.length !== filtered.length ? ` / ${positions.length}` : ''})
+        </Text>
         <Text style={styles.tableSub}>{openCount} open · {closedCount} closed</Text>
       </View>
-      {sorted.map((p) => {
+      <PositionFilterChips value={filter} onChange={setFilter} />
+      {filtered.length === 0 ? (
+        <Text style={styles.tableEmpty}>No positions match this filter.</Text>
+      ) : (
+        filtered.map((p) => {
         const isOpen   = p.status === 'OPEN';
         const currVal  = isOpen ? (p.finalValue ?? 0) : (p.usdcReceived ?? 0);
         const pnlPct   = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
@@ -263,6 +443,7 @@ function PositionsTable({
               </Text>
               <Text style={styles.tableMeta}>
                 ${fmt(p.usdcInvested)} → ${fmt(currVal)} · {isOpen ? 'now' : 'sell'} ${fmt(refPrice, 0)} (buy ${fmt(p.buyPrice, 0)})
+                {!isOpen && p.closeReason === 'stop_loss' ? ' · stop-loss' : ''}
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -275,7 +456,8 @@ function PositionsTable({
             </View>
           </View>
         );
-      })}
+        })
+      )}
     </View>
   );
 }
@@ -312,6 +494,7 @@ const styles = StyleSheet.create({
 
   tableCard:   { backgroundColor: '#111827', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#1f2937', marginBottom: 12 },
   tableHead:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
+  tableEmpty:  { color: '#6b7280', fontSize: 13, paddingVertical: 16, textAlign: 'center' },
   tableSub:    { fontSize: 11, color: '#6b7280' },
   tableRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#1f2937' },
   tableAsset:  { fontSize: 13, fontWeight: '600', color: '#fff' },
@@ -321,6 +504,10 @@ const styles = StyleSheet.create({
   tableBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#1f2937', marginTop: 4 },
   tableBadgeOpen: { backgroundColor: '#1e3a8a' },
   tableBadgeTxt: { fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' },
+  slRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1f2937' },
+  slLabel:       { fontSize: 13, fontWeight: '600', color: '#e5e7eb' },
+  slSub:         { fontSize: 10, color: '#6b7280', marginTop: 4, lineHeight: 14 },
+  slPctRow:      { marginTop: 10 },
   eth:         { color: '#60a5fa' },
   btc:         { color: '#fb923c' },
 });

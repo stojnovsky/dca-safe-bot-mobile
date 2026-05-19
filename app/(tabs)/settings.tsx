@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, Alert, Switch,
+  StyleSheet, Alert, Switch, Share, Platform,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { getConfig, saveConfig, getPrivateKey, savePrivateKey } from '@/lib/config-store';
@@ -15,7 +15,31 @@ import {
   runDcaTaskNow,
 } from '@/tasks/dca-task';
 import * as BackgroundTask from 'expo-background-task';
+import * as Clipboard from 'expo-clipboard';
 import type { BotConfig } from '@/lib/types';
+import { exportPositionsToJson, importPositionsFromJson } from '@/lib/positions-export';
+
+function parsePos(v: string, fallback: number): number {
+  const n = parseFloat(v);
+  return !isNaN(n) && n > 0 ? n : fallback;
+}
+
+/** For % knobs: allow 0 to disable that side (stop-loss / reopen) or use 0% take-profit. */
+function parseNonNeg(v: string, fallback: number): number {
+  const n = parseFloat(v);
+  return !isNaN(n) && n >= 0 ? n : fallback;
+}
+
+type NumDraft = {
+  dailyAmountEth: string;
+  dailyAmountBtc: string;
+  profitThresholdEth: string;
+  profitThresholdBtc: string;
+  stopLossPctEth: string;
+  stopLossPctBtc: string;
+  reopenDownPctEth: string;
+  reopenDownPctBtc: string;
+};
 
 function Field({ label, sub, value, onChangeText, secureTextEntry, placeholder, mono }: {
   label: string; sub?: string; value: string;
@@ -43,13 +67,41 @@ function Field({ label, sub, value, onChangeText, secureTextEntry, placeholder, 
 }
 
 export default function SettingsScreen() {
-  const [config,  setConfig]  = useState<BotConfig>({ safeAddress: '', rpcUrl: DEFAULT_RPC, pricesApiUrl: DEFAULT_PRICES_API_URL, dailyAmountEth: 5, dailyAmountBtc: 5, profitThreshold: 5 });
+  const [config,  setConfig]  = useState<BotConfig>({
+    safeAddress: '',
+    rpcUrl: DEFAULT_RPC,
+    pricesApiUrl: DEFAULT_PRICES_API_URL,
+    dailyAmountEth: 5,
+    dailyAmountBtc: 5,
+    profitThresholdEth: 5,
+    profitThresholdBtc: 5,
+    stopLossEnabled: false,
+    stopLossPctEth: 10,
+    stopLossPctBtc: 10,
+    reopenEnabled: false,
+    reopenDownPctEth: 5,
+    reopenDownPctBtc: 5,
+    showLogsTab: false,
+    gamifyPositions: true,
+  });
+  const [numDraft, setNumDraft] = useState<NumDraft>({
+    dailyAmountEth: '5',
+    dailyAmountBtc: '5',
+    profitThresholdEth: '5',
+    profitThresholdBtc: '5',
+    stopLossPctEth: '10',
+    stopLossPctBtc: '10',
+    reopenDownPctEth: '5',
+    reopenDownPctBtc: '5',
+  });
   const [pk,      setPk]      = useState('');
   const [botOn,   setBotOn]   = useState(false);
   const [bgStatus, setBgStatus] = useState<BackgroundTask.BackgroundTaskStatus | null>(null);
   const [triggering, setTriggering] = useState(false);
   const [saved,   setSaved]   = useState(false);
   const [safeInfo, setSafeInfo] = useState<{ owners: string[]; threshold: number } | null>(null);
+  const [positionsImportText, setPositionsImportText] = useState('');
+  const [positionsBusy, setPositionsBusy] = useState(false);
 
   useFocusEffect(useCallback(() => {
     (async () => {
@@ -58,6 +110,16 @@ export default function SettingsScreen() {
         isDcaTaskRegistered(), getBackgroundTaskStatus(),
       ]);
       setConfig(cfg);
+      setNumDraft({
+        dailyAmountEth: String(cfg.dailyAmountEth),
+        dailyAmountBtc: String(cfg.dailyAmountBtc),
+        profitThresholdEth: String(cfg.profitThresholdEth ?? 5),
+        profitThresholdBtc: String(cfg.profitThresholdBtc ?? 5),
+        stopLossPctEth: String(cfg.stopLossPctEth ?? 10),
+        stopLossPctBtc: String(cfg.stopLossPctBtc ?? 10),
+        reopenDownPctEth: String(cfg.reopenDownPctEth ?? 5),
+        reopenDownPctBtc: String(cfg.reopenDownPctBtc ?? 5),
+      });
       if (storedPk) setPk(storedPk);
       setBotOn(registered);
       setBgStatus(status);
@@ -66,7 +128,17 @@ export default function SettingsScreen() {
 
   const save = async () => {
     try {
-      await saveConfig(config);
+      await saveConfig({
+        ...config,
+        dailyAmountEth:       parsePos(numDraft.dailyAmountEth, config.dailyAmountEth),
+        dailyAmountBtc:       parsePos(numDraft.dailyAmountBtc, config.dailyAmountBtc),
+        profitThresholdEth: parseNonNeg(numDraft.profitThresholdEth, config.profitThresholdEth ?? 5),
+        profitThresholdBtc: parseNonNeg(numDraft.profitThresholdBtc, config.profitThresholdBtc ?? 5),
+        stopLossPctEth:     parseNonNeg(numDraft.stopLossPctEth, config.stopLossPctEth ?? 10),
+        stopLossPctBtc:     parseNonNeg(numDraft.stopLossPctBtc, config.stopLossPctBtc ?? 10),
+        reopenDownPctEth:   parseNonNeg(numDraft.reopenDownPctEth, config.reopenDownPctEth ?? 5),
+        reopenDownPctBtc:   parseNonNeg(numDraft.reopenDownPctBtc, config.reopenDownPctBtc ?? 5),
+      });
       if (pk) await savePrivateKey(pk);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -106,6 +178,88 @@ export default function SettingsScreen() {
       Alert.alert('Background task error', String(e));
       setBotOn(!on);
     }
+  };
+
+  const exportPositionsBackup = async () => {
+    setPositionsBusy(true);
+    try {
+      const json = await exportPositionsToJson();
+      const meta = JSON.parse(json) as { positions?: unknown[]; usdcPositions?: unknown[] };
+      const nPos = meta.positions?.length ?? 0;
+      const nUsdc = meta.usdcPositions?.length ?? 0;
+      await Clipboard.setStringAsync(json);
+      Alert.alert(
+        'Copied to clipboard',
+        `${nPos} position(s) and ${nUsdc} USDC row(s). Paste into Notes or send to your other device, then use Import there.\n\nThis does not include your private key or Safe address — set those separately on the new device.`,
+      );
+    } catch (e) {
+      Alert.alert('Export failed', String(e));
+    } finally {
+      setPositionsBusy(false);
+    }
+  };
+
+  const sharePositionsBackup = async () => {
+    setPositionsBusy(true);
+    try {
+      const json = await exportPositionsToJson();
+      await Share.share({
+        message: json,
+        title: 'DCA positions backup',
+      });
+    } catch {
+      /* User cancelled the share sheet or share is unavailable */
+    } finally {
+      setPositionsBusy(false);
+    }
+  };
+
+  const pasteImportFromClipboard = async () => {
+    try {
+      const t = await Clipboard.getStringAsync();
+      setPositionsImportText(t ?? '');
+    } catch (e) {
+      Alert.alert('Clipboard', String(e));
+    }
+  };
+
+  const runPositionsImport = (mode: 'merge' | 'replace') => {
+    const raw = positionsImportText.trim();
+    if (!raw) {
+      Alert.alert('Nothing to import', 'Paste an export JSON string first (or use Paste from clipboard).');
+      return;
+    }
+    const title = mode === 'replace' ? 'Replace all positions?' : 'Merge positions?';
+    const message = mode === 'replace'
+      ? 'This removes every position and USDC leg stored on this device, then loads the backup. Use this when restoring on a new phone. This cannot be undone.'
+      : 'Rows whose IDs already exist are skipped. USDC rows are skipped if their linked position is missing.';
+
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: mode === 'replace' ? 'Replace' : 'Merge',
+        style: mode === 'replace' ? 'destructive' : 'default',
+        onPress: async () => {
+          setPositionsBusy(true);
+          try {
+            const r = await importPositionsFromJson(raw, mode);
+            if (mode === 'replace') {
+              Alert.alert('Import complete', `Loaded ${r.positionsImported} position(s) and ${r.usdcImported} USDC row(s).`);
+            } else {
+              Alert.alert(
+                'Import complete',
+                `Added ${r.positionsImported} position(s) (${r.positionsSkipped} skipped), ${r.usdcImported} USDC row(s) (${r.usdcSkipped} skipped).`,
+              );
+            }
+            setPositionsImportText('');
+          } catch (e) {
+            Alert.alert('Import failed', String(e));
+          } finally {
+            setPositionsBusy(false);
+          }
+        },
+      },
+    ]);
   };
 
   const runNow = async () => {
@@ -151,11 +305,6 @@ export default function SettingsScreen() {
     bgStatus === BackgroundTask.BackgroundTaskStatus.Restricted ? 'Restricted (Background App Refresh disabled)' :
     bgStatus === null                                           ? '…'          : 'Unknown';
 
-  const set = (key: keyof BotConfig) => (v: string) => {
-    const numeric = ['dailyAmountEth', 'dailyAmountBtc', 'profitThreshold'];
-    setConfig((c) => ({ ...c, [key]: numeric.includes(key) ? parseFloat(v) || 0 : v }));
-  };
-
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Settings</Text>
@@ -163,9 +312,9 @@ export default function SettingsScreen() {
       {/* Safe wallet */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Safe Wallet</Text>
-        <Field label="Safe Address" placeholder="0x…" value={config.safeAddress} onChangeText={set('safeAddress')} mono />
+        <Field label="Safe Address" placeholder="0x…" value={config.safeAddress} onChangeText={(v) => setConfig((c) => ({ ...c, safeAddress: v }))} mono />
         <Field label="Bot Private Key" sub="Stored in iOS Keychain (Secure Enclave)" placeholder="0x…" value={pk} onChangeText={setPk} secureTextEntry mono />
-        <Field label="RPC URL" placeholder={DEFAULT_RPC} value={config.rpcUrl} onChangeText={set('rpcUrl')} mono />
+        <Field label="RPC URL" placeholder={DEFAULT_RPC} value={config.rpcUrl} onChangeText={(v) => setConfig((c) => ({ ...c, rpcUrl: v }))} mono />
 
         <TouchableOpacity style={styles.secondaryBtn} onPress={verifySafe}>
           <Text style={styles.secondaryBtnTxt}>Verify Safe on-chain</Text>
@@ -188,14 +337,108 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>DCA Strategy</Text>
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Field label="ETH buy / day" placeholder="5" value={String(config.dailyAmountEth)} onChangeText={set('dailyAmountEth')} />
+            <Field label="ETH buy / day" placeholder="5" value={numDraft.dailyAmountEth} onChangeText={(v) => setNumDraft((d) => ({ ...d, dailyAmountEth: v }))} />
           </View>
           <View style={{ width: 12 }} />
           <View style={{ flex: 1 }}>
-            <Field label="BTC buy / day" placeholder="5" value={String(config.dailyAmountBtc)} onChangeText={set('dailyAmountBtc')} />
+            <Field label="BTC buy / day" placeholder="5" value={numDraft.dailyAmountBtc} onChangeText={(v) => setNumDraft((d) => ({ ...d, dailyAmountBtc: v }))} />
           </View>
         </View>
-        <Field label="Sell at profit %" placeholder="5" value={String(config.profitThreshold)} onChangeText={set('profitThreshold')} />
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Sell ETH at +%"
+              placeholder="5"
+              value={numDraft.profitThresholdEth}
+              onChangeText={(v) => setNumDraft((d) => ({ ...d, profitThresholdEth: v }))}
+            />
+          </View>
+          <View style={{ width: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Sell BTC at +%"
+              placeholder="5"
+              value={numDraft.profitThresholdBtc}
+              onChangeText={(v) => setNumDraft((d) => ({ ...d, profitThresholdBtc: v }))}
+            />
+          </View>
+        </View>
+
+        <View style={[styles.toggleRow, { marginTop: 16 }]}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Stop-loss</Text>
+            <Text style={styles.toggleSub}>
+              Off by default. When enabled, sells if unrealized PnL is at or below −ETH/BTC % from buy (after take-profit). Use 0% on one asset to skip stop-loss for that asset only.
+            </Text>
+          </View>
+          <Switch
+            value={config.stopLossEnabled === true}
+            onValueChange={(v) => setConfig((c) => ({ ...c, stopLossEnabled: v }))}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
+        </View>
+        {config.stopLossEnabled ? (
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Field
+                label="ETH max drawdown %"
+                sub="From buy (10 = −10%)"
+                placeholder="10"
+                value={numDraft.stopLossPctEth}
+                onChangeText={(v) => setNumDraft((d) => ({ ...d, stopLossPctEth: v }))}
+              />
+            </View>
+            <View style={{ width: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Field
+                label="BTC max drawdown %"
+                sub="From buy (10 = −10%)"
+                placeholder="10"
+                value={numDraft.stopLossPctBtc}
+                onChangeText={(v) => setNumDraft((d) => ({ ...d, stopLossPctBtc: v }))}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        <View style={[styles.toggleRow, { marginTop: 16 }]}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Reopen on dip</Text>
+            <Text style={styles.toggleSub}>
+              Off by default. Reopens a closed leg when spot falls the ETH/BTC % below its last exit (re-uses exit USDC). Use 0% on one asset to never reopen that asset from dip alone.
+            </Text>
+          </View>
+          <Switch
+            value={config.reopenEnabled === true}
+            onValueChange={(v) => setConfig((c) => ({ ...c, reopenEnabled: v }))}
+            thumbColor="#3b82f6"
+            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+          />
+        </View>
+        {config.reopenEnabled ? (
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Field
+                label="ETH dip from exit %"
+                sub="e.g. 5 → spot ≤ exit × (1 − 5%)"
+                placeholder="5"
+                value={numDraft.reopenDownPctEth}
+                onChangeText={(v) => setNumDraft((d) => ({ ...d, reopenDownPctEth: v }))}
+              />
+            </View>
+            <View style={{ width: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Field
+                label="BTC dip from exit %"
+                sub="e.g. 5 → spot ≤ exit × (1 − 5%)"
+                placeholder="5"
+                value={numDraft.reopenDownPctBtc}
+                onChangeText={(v) => setNumDraft((d) => ({ ...d, reopenDownPctBtc: v }))}
+              />
+            </View>
+          </View>
+        ) : null}
       </View>
 
       {/* Prices API */}
@@ -206,7 +449,7 @@ export default function SettingsScreen() {
           sub="medit/prices-api backend serving BTC/ETH historical prices"
           placeholder={DEFAULT_PRICES_API_URL}
           value={config.pricesApiUrl}
-          onChangeText={set('pricesApiUrl')}
+          onChangeText={(v) => setConfig((c) => ({ ...c, pricesApiUrl: v }))}
           mono
         />
       </View>
@@ -249,6 +492,62 @@ export default function SettingsScreen() {
             {triggering ? 'Triggering…' : 'Run Background Task Now (debug)'}
           </Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Positions backup (migrate to another device) */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Positions backup</Text>
+        <Text style={styles.toggleSub}>
+          Export copies your local position history (opens, closes, USDC legs) as JSON. On the new device, enter the same Safe and private key in Settings, then import the JSON here. Your keys are never included in the export.
+        </Text>
+        <View style={[styles.row, { marginTop: 12, flexWrap: 'wrap', gap: 8 }]}>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, styles.flexBtn]}
+            onPress={exportPositionsBackup}
+            disabled={positionsBusy}
+          >
+            <Text style={styles.secondaryBtnTxt}>{positionsBusy ? '…' : 'Copy export to clipboard'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, styles.flexBtn]}
+            onPress={sharePositionsBackup}
+            disabled={positionsBusy}
+          >
+            <Text style={styles.secondaryBtnTxt}>Share export…</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Import JSON</Text>
+        <Text style={styles.fieldSub}>Paste a backup from another device, then choose merge or replace.</Text>
+        <TextInput
+          style={styles.importInput}
+          value={positionsImportText}
+          onChangeText={setPositionsImportText}
+          placeholder='{"format":"dca-safe-positions-v1",…}'
+          placeholderTextColor="#4b5563"
+          multiline
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <View style={[styles.row, { marginTop: 8, flexWrap: 'wrap', gap: 8 }]}>
+          <TouchableOpacity style={[styles.secondaryBtn, styles.flexBtn]} onPress={pasteImportFromClipboard}>
+            <Text style={styles.secondaryBtnTxt}>Paste from clipboard</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, styles.flexBtn]}
+            onPress={() => runPositionsImport('merge')}
+            disabled={positionsBusy}
+          >
+            <Text style={styles.secondaryBtnTxt}>Import (merge)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, styles.flexBtn]}
+            onPress={() => runPositionsImport('replace')}
+            disabled={positionsBusy}
+          >
+            <Text style={[styles.secondaryBtnTxt, { color: '#f87171' }]}>Import (replace all)</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Display preferences */}
@@ -312,7 +611,22 @@ const styles = StyleSheet.create({
   fieldInput:    { backgroundColor: '#1f2937', color: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, borderWidth: 1, borderColor: '#374151' },
   monoInput:     { fontVariant: ['tabular-nums'], fontSize: 12 },
   row:           { flexDirection: 'row' },
+  flexBtn:       { flexGrow: 1, flexBasis: '45%', minWidth: 140 },
   secondaryBtn:  { backgroundColor: '#1f2937', borderRadius: 8, paddingVertical: 8, alignItems: 'center', marginTop: 4 },
+  importInput:   {
+    backgroundColor: '#0d1117',
+    color: '#e5e7eb',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 11,
+    fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }),
+    borderWidth: 1,
+    borderColor: '#374151',
+    minHeight: 100,
+    marginTop: 8,
+    textAlignVertical: 'top',
+  },
   secondaryBtnTxt: { color: '#9ca3af', fontSize: 13 },
   infoBox:       { backgroundColor: '#0d1117', borderRadius: 8, padding: 10, marginTop: 8 },
   infoTxt:       { color: '#10b981', fontSize: 12, marginBottom: 4 },

@@ -20,7 +20,7 @@ This guide focuses on **day-to-day usage** and **how to verify** that Simulation
 ### Option B — Manual configuration
 
 1. Open **Settings**.
-2. Enter **Safe Address** (Base), **Bot Private Key** (signer EOA stored in Keychain), and **RPC URL** if not using the default.
+2. Enter **Safe Address** (Base), **Bot Private Key** (signer EOA stored in secure storage), and **RPC URL** if not using the default.
 3. Set **DCA Strategy** (daily USDC for ETH/BTC, profit threshold %).
 4. Optionally set **Prices API** base URL for historical prices used in Simulation / charts.
 5. Tap **Save Settings**.
@@ -42,7 +42,7 @@ This guide focuses on **day-to-day usage** and **how to verify** that Simulation
 
 - Shows live balances when a Safe address and RPC work (WETH, cbBTC, USDC in the Safe).
 - **Refresh** pulls latest config and recomputes the chart when history exists.
-- **Run DCA Now** executes one full bot cycle on-chain: sells profitable positions, then daily buys (ETH + BTC in **one batched Safe transaction** when both legs run the same day).
+- **Run DCA Now** executes one full bot cycle on-chain: sells profitable positions, then daily buys (ETH + BTC in **one batched Safe transaction** when both legs run the same day). Daily buy eligibility uses **your device’s local calendar** (YYYY-MM-DD after local **00:00**), at most once per asset per day.
 - Same gamification / table toggle as in Settings (**Gamify positions**, **Leaves vs Coins**).
 
 ### Settings
@@ -122,7 +122,7 @@ Expect **imprecise** scheduling: iOS may defer processing based on battery, focu
 
 - **macOS**, **Xcode**, **Node 20+**, **npm**
 - **CocoaPods** if you touch native iOS (`pod install`)
-- An **iPhone** (recommended for background tasks) or the **iOS Simulator**
+- An **iPhone** (recommended for background tasks) or the **iOS Simulator**; for **Android**, a device or emulator with USB debugging (see [`docs/ANDROID_BUILD.md`](docs/ANDROID_BUILD.md))
 
 Install dependencies from the repo root:
 
@@ -139,15 +139,18 @@ npm install --legacy-peer-deps
 | Metro only | `npm start` |
 | iOS Simulator (build + launch) | `npm run ios` or `npx expo run:ios` |
 | Physical iPhone (USB) | `npm run ios-device` or `npx expo run:ios --device` |
+| Android (after `npm run prebuild:android`) | `npm run android` or `npx expo run:android` |
 
-After changing native config (`app.json`, plugins), regenerate iOS native files when needed:
+Full Android / JDK / EAS checklist: **[`docs/ANDROID_BUILD.md`](docs/ANDROID_BUILD.md)**.
+
+After changing native config (`app.json`, plugins), regenerate native projects when needed:
 
 ```bash
 npx expo prebuild --clean -p ios
+# or Android:
+npx expo prebuild --clean -p android
 ```
 
-Then open `ios/*.xcworkspace` in Xcode or run `npm run ios` again.
-
-For device installs beyond quick USB builds, see [`docs/sideloading.md`](docs/sideloading.md).
+Then open `ios/*.xcworkspace` in Xcode or run `npm run ios` again; for Android use Android Studio or `npm run android`.
 
 ---

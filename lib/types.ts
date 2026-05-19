@@ -3,6 +3,26 @@ export interface DailyPrice {
   price: number;
 }
 
+/** How a closed spot position was exited (for UI / gamification). */
+export type PositionCloseReason = 'take_profit' | 'stop_loss';
+
+/** Journal entries for opens / closes / reopens (shown in coin detail). */
+export type PositionLifecycleAction =
+  | 'open'
+  | 'close_take_profit'
+  | 'close_stop_loss'
+  | 'reopen';
+
+export interface PositionLifecycleEvent {
+  date: string;
+  action: PositionLifecycleAction;
+  price: number;
+  usdcInvested?: number;
+  assetAmount?: number;
+  usdcReceived?: number;
+  profitPct?: number;
+}
+
 export interface CryptoPosition {
   id: string;
   asset: 'ETH' | 'BTC';
@@ -21,6 +41,9 @@ export interface CryptoPosition {
   finalValue?: number;
   unrealizedPnlUsd?: number;
   unrealizedPnlPct?: number;
+  closeReason?: PositionCloseReason;
+  /** Open / close / reopen history for this row (simulation + persisted live). */
+  lifecycle?: PositionLifecycleEvent[];
 }
 
 export interface UsdcPosition {
@@ -77,7 +100,25 @@ export interface SimulationResult {
 export interface BacktestConfig {
   dailyAmountEth: number;
   dailyAmountBtc: number;
-  profitThreshold: number;
+  /** Take-profit: sell ETH when unrealized gain ≥ this % from buy. */
+  profitThresholdEth: number;
+  /** Take-profit: sell BTC when unrealized gain ≥ this % from buy. */
+  profitThresholdBtc: number;
+  /**
+   * When true, close positions whose unrealized PnL from buy price is at or
+   * below negative asset-specific stop-loss % (after take-profit checks).
+   */
+  stopLossEnabled?: boolean;
+  /** Stop-loss magnitude for ETH (e.g. 10 = exit at −10% from entry). */
+  stopLossPctEth?: number;
+  stopLossPctBtc?: number;
+  /**
+   * When true, a **closed** row can become OPEN again if spot falls at least
+   * the asset-specific % below the price at which it was last sold.
+   */
+  reopenEnabled?: boolean;
+  reopenDownPctEth?: number;
+  reopenDownPctBtc?: number;
 }
 
 export interface BotConfig extends BacktestConfig {

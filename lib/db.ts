@@ -1,11 +1,12 @@
 import * as SQLite from 'expo-sqlite';
 
 let _db: SQLite.SQLiteDatabase | null = null;
+/** Single-flight open: parallel callers must await the same init (avoids Android NPE in prepareAsync). */
+let _opening: Promise<SQLite.SQLiteDatabase> | null = null;
 
-export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (_db) return _db;
-  _db = await SQLite.openDatabaseAsync('dca-bot.db');
-  await _db.execAsync(`
+async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
+  const db = await SQLite.openDatabaseAsync('dca-bot.db');
+  await db.execAsync(`
     PRAGMA journal_mode = WAL;
 
     DROP TABLE IF EXISTS price_cache;
@@ -50,5 +51,32 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE INDEX IF NOT EXISTS idx_bot_runs_ts ON bot_runs(timestamp DESC);
   `);
-  return _db;
+  try {
+    await db.execAsync('ALTER TABLE positions ADD COLUMN close_reason TEXT;');
+  } catch {
+    /* column already exists */
+  }
+  try {
+    await db.execAsync('ALTER TABLE positions ADD COLUMN lifecycle_json TEXT;');
+  } catch {
+    /* column already exists */
+  }
+  return db;
+}
+
+export async function getDb(): Promise<SQLite.SQLiteDatabase> {
+  if (_db) return _db;
+  if (!_opening) {
+    _opening = openAndMigrate().then((db) => {
+      _db = db;
+      return db;
+    });
+  }
+  try {
+    return await _opening;
+  } catch (e) {
+    _opening = null;
+    _db = null;
+    throw e;
+  }
 }

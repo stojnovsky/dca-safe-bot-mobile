@@ -7,7 +7,14 @@
     "ios-install-pod": "cd ios && pod install && cd ..",
     "ios": "expo run:ios",
     "ios-device": "expo run:ios --device",
-    "build": "eas build --platform ios"
+    "android": "expo run:android",
+    "android-device": "expo run:android --device",
+    "prebuild": "expo prebuild",
+    "prebuild:android": "expo prebuild --platform android",
+    "prebuild:ios": "expo prebuild --platform ios",
+    "build": "eas build --platform ios",
+    "build:android": "eas build --platform android",
+    "build:all": "eas build --platform all"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -24,7 +31,7 @@
     "expo-sqlite": "~55.0.15",
     "expo-status-bar": "~55.0.6",
     "expo-task-manager": "~55.0.15",
-    "react": "19.2.0",
+    "react": "19.2.6",
     "react-native": "0.83.6",
     "react-native-gesture-handler": "~2.30.0",
     "react-native-get-random-values": "^1.11.0",
