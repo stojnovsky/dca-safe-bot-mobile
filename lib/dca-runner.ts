@@ -8,6 +8,7 @@ import {
 } from './position-store';
 import { CONTRACTS, ERC20_ABI, PRICE_API_URL } from './constants';
 import type { BotConfig } from './types';
+import { localCalendarDate } from './calendar-day';
 import { reopenDownPctFor, stopLossPctFor, takeProfitPct } from './strategy-thresholds';
 
 const USDC_DECIMALS = 6;
@@ -37,7 +38,7 @@ export interface RunResult {
 }
 
 export async function runDailyDca(config: BotConfig, privateKey: `0x${string}`): Promise<RunResult> {
-  const today   = new Date().toISOString().slice(0, 10);
+  const today   = localCalendarDate();
   const result: RunResult = { date: today, buys: [], sells: [], errors: [] };
 
   const safeAddress = config.safeAddress as `0x${string}`;
@@ -193,4 +194,50 @@ export async function runDailyDca(config: BotConfig, privateKey: `0x${string}`):
   }
 
   return result;
+}
+
+/**
+ * Manually close a single **OPEN** position at current spot (same swap path as the bot).
+ * Records take-profit if PnL ≥ 0 at exit, otherwise stop-loss, for coin coloring.
+ */
+export async function closeOpenPositionNow(
+  config: BotConfig,
+  privateKey: `0x${string}`,
+  positionId: string,
+): Promise<{ ok: true; txHash: string } | { ok: false; error: string }> {
+  const pos = await getPositionById(positionId);
+  if (!pos) return { ok: false, error: 'Position not found' };
+  if (pos.status !== 'OPEN') return { ok: false, error: 'Position is not open' };
+
+  const safeAddress = config.safeAddress as `0x${string}`;
+  const { eth: ethPrice, btc: btcPrice } = await getLivePrices();
+  const currentPrice = pos.asset === 'ETH' ? ethPrice : btcPrice;
+  const pnlPct = ((currentPrice - pos.buyPrice) / pos.buyPrice) * 100;
+  const closeReason = pnlPct >= 0 ? 'take_profit' : 'stop_loss';
+  const today = localCalendarDate();
+
+  try {
+    const { txHash, usdcReceived } = await swapAssetForUsdc(
+      pos.assetAmount, pos.asset, safeAddress, privateKey, config.rpcUrl,
+    );
+    await closePosition(pos.id, {
+      sellDate:     today,
+      sellPrice:    currentPrice,
+      usdcReceived,
+      sellTxHash:   txHash,
+      profitUsd:    usdcReceived - pos.usdcInvested,
+      profitPct:    pnlPct,
+      closeReason,
+    });
+    await createUsdcPosition({
+      sourceAsset:      pos.asset,
+      sourcePositionId: pos.id,
+      createDate:       today,
+      sellPrice:        currentPrice,
+      usdcAmount:       usdcReceived,
+    });
+    return { ok: true, txHash };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }

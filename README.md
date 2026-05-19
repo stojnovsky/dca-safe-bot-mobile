@@ -127,7 +127,7 @@ Configure in **Settings**:
 **Android** (local builds)
 
 - **Node 20+** and **npm**
-- **JDK 17**, **Android Studio**, Android SDK (API 35) — see **[docs/ANDROID_BUILD.md](docs/ANDROID_BUILD.md)** for the full checklist
+- **JDK 17**, **Android Studio**, Android SDK (API **36**) — see **[docs/ANDROID_BUILD.md](docs/ANDROID_BUILD.md)** for the full checklist
 
 ### 1. Install dependencies
 

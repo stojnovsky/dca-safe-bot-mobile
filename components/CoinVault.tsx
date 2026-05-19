@@ -43,6 +43,8 @@ function fmt(n: number, d = 2): string {
 
 interface Props {
   positions: CryptoPosition[];
+  /** When set, tapping an **open** coin shows a "Close now" action (on-chain sell at spot). */
+  onRequestCloseOpen?: (p: CryptoPosition) => void;
 }
 
 function fmtLifecycle(ev: PositionLifecycleEvent): string {
@@ -61,7 +63,7 @@ function fmtLifecycle(ev: PositionLifecycleEvent): string {
   return `${ev.date}  ·  Close (stop-loss) @ ${px}  ·  ${fmt(pp)}%  ·  $${fmt(ev.usdcReceived ?? 0)} out`;
 }
 
-export default function CoinVault({ positions }: Props) {
+export default function CoinVault({ positions, onRequestCloseOpen }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const [filter, setFilter] = useState<PositionsViewFilter>('all');
   const [drill, setDrill]   = useState<Drill>({ level: 'years' });
@@ -156,8 +158,17 @@ export default function CoinVault({ positions }: Props) {
       p.lifecycle && p.lifecycle.length > 0
         ? ['', '— Activity (opens / closes / reopens) —', ...p.lifecycle.map(fmtLifecycle)]
         : [];
-    Alert.alert('Daily Coin', [...lines, ...lifeLines].join('\n'));
-  }, []);
+    const body = [...lines, ...lifeLines].join('\n');
+
+    if (isOpen && onRequestCloseOpen) {
+      Alert.alert('Daily Coin', body, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Close now', style: 'destructive', onPress: () => onRequestCloseOpen(p) },
+      ]);
+    } else {
+      Alert.alert('Daily Coin', body);
+    }
+  }, [onRequestCloseOpen]);
 
   const drillHint =
     drill.level === 'years'
@@ -187,6 +198,7 @@ export default function CoinVault({ positions }: Props) {
         <Text style={styles.sectionLabel}>Daily Coins ({positions.length})</Text>
         <Text style={styles.vaultSub}>
           {counts.open} open · {counts.closed} closed
+          {onRequestCloseOpen ? ' · live: tap → Close now' : ''}
         </Text>
       </View>
 

@@ -11,7 +11,7 @@ This project is an **Expo SDK 55** app. The `android/` directory is **not commit
 | **Node.js** | LTS (e.g. 20.x) — same as iOS development |
 | **JDK** | **17** (Android Gradle Plugin expects JDK 17; use `JAVA_HOME` pointing at a JDK 17 install) |
 | **Android Studio** | Latest stable — installs Android SDK, platform tools, and emulators |
-| **Android SDK** | Via Android Studio → SDK Manager: install **Android 15 (API 35)** platform (matches `compileSdkVersion` / `targetSdkVersion` in `app.json`) |
+| **Android SDK** | Via Android Studio → SDK Manager: install **Android API 36** platform (matches `compileSdkVersion` / `targetSdkVersion` in `app.json` and `android/gradle.properties`) |
 | **Environment** | Add `ANDROID_HOME` (or `ANDROID_SDK_ROOT`) to your shell; ensure `platform-tools` is on `PATH` so `adb` works |
 
 Optional but recommended:
@@ -109,7 +109,7 @@ After the build finishes, download the **.aab** or **.apk** from the Expo dashbo
 |-------|-------------|
 | **Application ID** | `com.dcasafebot.app` (`android.package` in `app.json`) — change only if you ship under a different id |
 | **Cleartext HTTP** | `usesCleartextTraffic: true` — needed for the default historical prices base URL (`http://prices.skyscraper.pro` in `lib/constants.ts`). For production, prefer **HTTPS** for that API and then you can turn cleartext off |
-| **SDK levels** | `expo-build-properties`: `minSdkVersion` 26, `compileSdkVersion` / `targetSdkVersion` 35 |
+| **SDK levels** | `expo-build-properties` + `gradle.properties`: `minSdkVersion` 26, `compileSdkVersion` / `targetSdkVersion` **36** (required by current AndroidX `core` 1.17.x) |
 | **Icon** | Adaptive icon uses `./assets/icon.png` with background `#030712` |
 
 Background scheduling uses **expo-background-task** / WorkManager; exact timing is **not** wall-clock hourly — same class of constraints as on iOS.
@@ -142,7 +142,7 @@ Expo looks for the SDK under **`~/Library/Android/sdk`** on macOS. If that folde
 
 5. Run again: `npm run android`
 
-If `~/Library/Android/sdk` still does not exist after installing Android Studio, open **SDK Manager** in Android Studio and install at least one **SDK Platform** (e.g. Android 15 / API 35) so the directory is created.
+If `~/Library/Android/sdk` still does not exist after installing Android Studio, open **SDK Manager** in Android Studio and install at least one **SDK Platform** (e.g. **API 36** for local builds) so the directory is created.
 
 ### Other issues
 
@@ -150,6 +150,8 @@ If `~/Library/Android/sdk` still does not exist after installing Android Studio,
 |---------|-------------|
 | `SDK location not found` (generic) | Same as above: set **`ANDROID_HOME`** to the path shown in Android Studio’s SDK settings, and add **`$ANDROID_HOME/platform-tools`** to **`PATH`**. |
 | Gradle / JDK errors | Ensure **JDK 17** is active (`java -version`). Android Studio can install an embedded JBR; point `JAVA_HOME` there if needed. |
+| `JvmVendorSpec … IBM_SEMERU` (Gradle 9) | Gradle **9** removed `IBM_SEMERU`; some toolchain plugins still expect it. This repo pins the wrapper to **Gradle 8.14.x** in `android/gradle/wrapper/gradle-wrapper.properties`. After changing it, run `cd android && ./gradlew --stop` then build again. |
+| `checkDebugAarMetadata` / `compile against version 36` | Install **Android SDK Platform 36** in SDK Manager, and keep **`compileSdkVersion` 36** in `app.json` / `android/gradle.properties` (AndroidX Core 1.17+ requires it). |
 | `expo run:android` cannot find device | `adb kill-server && adb start-server`, unlock phone, re-authorize USB debugging. |
 | Metro connection issues on device | Shake device → Dev settings → configure bundler IP, or use `npx expo start` and scan QR for dev client workflow. |
 | Cleartext / network errors | Confirm the prices API URL in **Settings**; if you use plain HTTP, keep `usesCleartextTraffic` or switch the server to HTTPS. |

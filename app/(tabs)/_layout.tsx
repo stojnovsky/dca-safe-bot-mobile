@@ -7,6 +7,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="portfolio"
       screenOptions={{
         headerShown:      false,
         tabBarStyle:      { backgroundColor: '#0d1117', borderTopColor: '#1f2937' },
@@ -15,8 +16,8 @@ export default function TabLayout() {
         tabBarLabelStyle: { fontSize: 11 },
       }}
     >
-      <Tabs.Screen name="index"     options={{ title: 'Simulation' }} />
       <Tabs.Screen name="portfolio" options={{ title: 'Portfolio'  }} />
+      <Tabs.Screen name="index"     options={{ title: 'Simulation' }} />
       <Tabs.Screen
         name="logs"
         // `href: null` hides the tab from the tabbar but keeps the route mounted

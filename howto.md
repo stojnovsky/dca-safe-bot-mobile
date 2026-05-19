@@ -42,7 +42,7 @@ This guide focuses on **day-to-day usage** and **how to verify** that Simulation
 
 - Shows live balances when a Safe address and RPC work (WETH, cbBTC, USDC in the Safe).
 - **Refresh** pulls latest config and recomputes the chart when history exists.
-- **Run DCA Now** executes one full bot cycle on-chain: sells profitable positions, then daily buys (ETH + BTC in **one batched Safe transaction** when both legs run the same day).
+- **Run DCA Now** executes one full bot cycle on-chain: sells profitable positions, then daily buys (ETH + BTC in **one batched Safe transaction** when both legs run the same day). Daily buy eligibility uses **your device’s local calendar** (YYYY-MM-DD after local **00:00**), at most once per asset per day.
 - Same gamification / table toggle as in Settings (**Gamify positions**, **Leaves vs Coins**).
 
 ### Settings

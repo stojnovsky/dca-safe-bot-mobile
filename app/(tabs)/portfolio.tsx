@@ -1,17 +1,18 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, StyleSheet, Alert, Linking,
+  ActivityIndicator, StyleSheet, Alert, Linking, RefreshControl,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { formatUnits } from 'viem';
 import { getConfig, getPrivateKey, useConfig } from '@/lib/config-store';
 import { getPublicClient } from '@/lib/safe';
 import { getAllPositions, getAllUsdcPositions } from '@/lib/position-store';
-import { runDailyDca } from '@/lib/dca-runner';
+import { runDailyDca, closeOpenPositionNow } from '@/lib/dca-runner';
 import { logBotRun, logBotEvent } from '@/lib/log-store';
 import { getPricesForRange } from '@/lib/price-store';
 import { buildPositionTimeline } from '@/lib/timeline';
+import { localCalendarDate } from '@/lib/calendar-day';
 import { CONTRACTS, ERC20_ABI, PRICE_API_URL } from '@/lib/constants';
 import type { BotConfig, CryptoPosition } from '@/lib/types';
 import StatCard from '@/components/StatCard';
@@ -27,6 +28,33 @@ import {
 
 function fmt(n: number, d = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+function fmtLongDate(ymd: string | null): string {
+  if (!ymd) return '—';
+  const p = ymd.split('-').map(Number);
+  const y = p[0];
+  const m = p[1];
+  const day = p[2];
+  if (!y || !m || !day) return ymd;
+  return new Date(y, m - 1, day).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function maxBuyDateForAsset(
+  pos: Awaited<ReturnType<typeof getAllPositions>>,
+  asset: 'ETH' | 'BTC',
+): string | null {
+  let max: string | null = null;
+  for (const p of pos) {
+    if (p.asset !== asset) continue;
+    if (!max || p.buyDate > max) max = p.buyDate;
+  }
+  return max;
 }
 
 interface LiveData {
@@ -120,6 +148,7 @@ export default function PortfolioScreen() {
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [timeline,   setTimeline]   = useState<ChartPoint[]>([]);
   const [positionFilter, setPositionFilter] = useState<PositionsViewFilter>('all');
+  const [closingOpenId, setClosingOpenId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -140,7 +169,7 @@ export default function PortfolioScreen() {
 
       if (pos.length > 0) {
         const start = [...pos].sort((a, b) => a.buyDate.localeCompare(b.buyDate))[0].buyDate;
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localCalendarDate();
         const [eth, btc] = await Promise.all([
           getPricesForRange('ethereum', start, today),
           getPricesForRange('bitcoin',  start, today),
@@ -162,6 +191,91 @@ export default function PortfolioScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+
+  const ethPrice      = live?.ethPrice ?? 0;
+  const btcPrice      = live?.btcPrice ?? 0;
+  const openPositions = positions.filter((p) => p.status === 'OPEN');
+
+  const filteredPortfolioPositions = useMemo(
+    () =>
+      positions.filter((p) =>
+        matchesPositionViewFilter(portfolioRowFilterFields(p, ethPrice, btcPrice), positionFilter),
+      ),
+    [positions, ethPrice, btcPrice, positionFilter],
+  );
+
+  const dcaDayInfo = useMemo(() => {
+    const today = localCalendarDate();
+    const ethLast = maxBuyDateForAsset(positions, 'ETH');
+    const btcLast = maxBuyDateForAsset(positions, 'BTC');
+    return {
+      today,
+      ethLast,
+      btcLast,
+      ethDoneToday: ethLast === today,
+      btcDoneToday: btcLast === today,
+    };
+  }, [positions]);
+
+  const positionStats = useMemo(() => {
+    let ethOpen = 0, ethClosed = 0, btcOpen = 0, btcClosed = 0;
+    for (const p of positions) {
+      if (p.asset === 'ETH') {
+        if (p.status === 'OPEN') ethOpen++;
+        else ethClosed++;
+      } else if (p.asset === 'BTC') {
+        if (p.status === 'OPEN') btcOpen++;
+        else btcClosed++;
+      }
+    }
+    return { ethOpen, ethClosed, btcOpen, btcClosed };
+  }, [positions]);
+
+  const confirmAndCloseOpen = useCallback(
+    (positionId: string, label: string) => {
+      if (!config?.safeAddress) return;
+      Alert.alert(
+        'Close on-chain?',
+        `Swap this ${label} position to USDC at current spot from your Safe. Gas is paid from the bot signer’s ETH on Base.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Confirm',
+            style: 'destructive',
+            onPress: async () => {
+              const pk = await getPrivateKey();
+              if (!pk) {
+                Alert.alert('Private key', 'Add a bot private key in Settings.');
+                return;
+              }
+              setClosingOpenId(positionId);
+              try {
+                const r = await closeOpenPositionNow(config, pk as `0x${string}`, positionId);
+                if (r.ok) {
+                  Alert.alert('Position closed', `Tx: ${r.txHash.slice(0, 12)}…${r.txHash.slice(-8)}`);
+                  await logBotEvent('manual', 'ok', `Manual close ${label}`, { txHash: r.txHash });
+                } else {
+                  Alert.alert('Close failed', r.error);
+                  await logBotEvent('manual', 'error', `Manual close failed: ${r.error}`, { positionId });
+                }
+              } finally {
+                setClosingOpenId(null);
+                refresh();
+              }
+            },
+          },
+        ],
+      );
+    },
+    [config, refresh],
+  );
+
+  const onVaultRequestCloseOpen = useCallback(
+    (p: CryptoPosition) => {
+      confirmAndCloseOpen(p.id, `${p.asset} · ${p.buyDate}`);
+    },
+    [confirmAndCloseOpen],
+  );
 
   // Brand-new install: no Safe configured → show the onboarding pitch in place
   // of the regular portfolio UI. We wait until `config` is loaded so we don't
@@ -220,18 +334,6 @@ export default function PortfolioScreen() {
     }
   };
 
-  const openPositions = positions.filter((p) => p.status === 'OPEN');
-  const ethPrice      = live?.ethPrice ?? 0;
-  const btcPrice      = live?.btcPrice ?? 0;
-
-  const filteredPortfolioPositions = useMemo(
-    () =>
-      positions.filter((p) =>
-        matchesPositionViewFilter(portfolioRowFilterFields(p, ethPrice, btcPrice), positionFilter),
-      ),
-    [positions, ethPrice, btcPrice, positionFilter],
-  );
-
   const netWorth = live
     ? live.wethInSafe * ethPrice + live.cbBtcInSafe * btcPrice + live.usdcInSafe
     : 0;
@@ -252,6 +354,14 @@ export default function PortfolioScreen() {
       style={styles.screen}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={refresh}
+          tintColor="#9ca3af"
+          colors={['#3b82f6', '#60a5fa']}
+        />
+      }
     >
       {/* Header */}
       <View style={styles.header}>
@@ -261,13 +371,44 @@ export default function PortfolioScreen() {
             <Text style={styles.address}>{config.safeAddress.slice(0, 10)}…{config.safeAddress.slice(-8)}</Text>
           )}
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={refresh} disabled={loading}>
+        <TouchableOpacity style={styles.refreshBtn} onPress={refresh} disabled={loading || closingOpenId !== null}>
           <Text style={styles.refreshTxt}>{loading ? '…' : 'Refresh'}</Text>
         </TouchableOpacity>
       </View>
 
       {config && config.safeAddress ? (
         <CollapsibleDcaStrategyPanel botConfig={config} onSaved={refresh} />
+      ) : null}
+
+      {config?.safeAddress ? (
+        <View style={styles.dcaInfoCard}>
+          <Text style={styles.dcaInfoTitle}>Last DCA buys</Text>
+          <Text style={styles.dcaInfoSub}>
+            Calendar day is <Text style={styles.dcaInfoEm}>{dcaDayInfo.today}</Text> (device local time). A new buy is allowed after{' '}
+            <Text style={styles.dcaInfoEm}>00:00</Text> — at most one ETH and one BTC leg per day when the bot runs.
+          </Text>
+          <Text style={styles.dcaInfoLine}>
+            <Text style={styles.eth}>ETH</Text>
+            {' · '}last buy {fmtLongDate(dcaDayInfo.ethLast)}
+            {dcaDayInfo.ethDoneToday ? ' · today’s leg on record' : ' · no buy logged today yet'}
+          </Text>
+          <Text style={styles.dcaInfoLine}>
+            <Text style={styles.btc}>BTC</Text>
+            {' · '}last buy {fmtLongDate(dcaDayInfo.btcLast)}
+            {dcaDayInfo.btcDoneToday ? ' · today’s leg on record' : ' · no buy logged today yet'}
+          </Text>
+
+          <View style={styles.dcaInfoDivider} />
+          <Text style={styles.dcaInfoSmallTitle}>Legs by asset</Text>
+          <Text style={styles.dcaInfoLine}>
+            <Text style={styles.eth}>ETH</Text>
+            {' · '}{positionStats.ethOpen} open · {positionStats.ethClosed} closed
+          </Text>
+          <Text style={styles.dcaInfoLine}>
+            <Text style={styles.btc}>BTC</Text>
+            {' · '}{positionStats.btcOpen} open · {positionStats.btcClosed} closed
+          </Text>
+        </View>
       ) : null}
 
       {/* Stat cards */}
@@ -296,7 +437,11 @@ export default function PortfolioScreen() {
       )}
 
       {/* Run bot */}
-      <TouchableOpacity style={[styles.runBtn, running && styles.runBtnDisabled]} onPress={runBot} disabled={running}>
+      <TouchableOpacity
+        style={[styles.runBtn, (running || closingOpenId !== null) && styles.runBtnDisabled]}
+        onPress={runBot}
+        disabled={running || closingOpenId !== null}
+      >
         {running
           ? <ActivityIndicator color="#fff" size="small" />
           : <Text style={styles.runBtnTxt}>Run DCA Now</Text>
@@ -322,7 +467,10 @@ export default function PortfolioScreen() {
           <Text style={styles.empty}>No positions yet. Run the bot to start.</Text>
         </View>
       ) : gamify ? (
-        <CoinVault positions={positions.map((p) => enrichForVault(p, ethPrice, btcPrice))} />
+        <CoinVault
+          positions={positions.map((p) => enrichForVault(p, ethPrice, btcPrice))}
+          onRequestCloseOpen={config?.safeAddress ? onVaultRequestCloseOpen : undefined}
+        />
       ) : (
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>
@@ -345,10 +493,33 @@ export default function PortfolioScreen() {
 
             return (
               <View key={p.id} style={styles.posRow}>
+                <TouchableOpacity
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                  disabled={p.status !== 'OPEN' || !config?.safeAddress || closingOpenId !== null}
+                  activeOpacity={p.status === 'OPEN' && config?.safeAddress ? 0.65 : 1}
+                  onPress={() => {
+                    if (p.status !== 'OPEN' || !config?.safeAddress) return;
+                    Alert.alert(
+                      `${p.asset} (open)`,
+                      `Bought ${p.buyDate} · $${fmt(p.usdcInvested)} in. Tap Confirm to sell at spot, or use the link for the buy tx.`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Close now',
+                          style: 'destructive',
+                          onPress: () => confirmAndCloseOpen(p.id, `${p.asset} · ${p.buyDate}`),
+                        },
+                      ],
+                    );
+                  }}
+                >
                 <View style={{ flex: 1 }}>
                   <Text style={styles.posAsset}>
                     <Text style={p.asset === 'ETH' ? styles.eth : styles.btc}>{p.asset}</Text>
                     {'  '}<Text style={styles.posDate}>{p.buyDate}</Text>
+                    {p.status === 'OPEN' && config?.safeAddress ? (
+                      <Text style={styles.posTapHint}> · tap to close</Text>
+                    ) : null}
                   </Text>
                   <Text style={styles.posMeta}>
                     ${fmt(p.usdcInvested)} → ${fmt(currVal)} · buy ${fmt(p.buyPrice, 0)}
@@ -362,6 +533,7 @@ export default function PortfolioScreen() {
                     <Text style={styles.statusTxt}>{p.status}</Text>
                   </View>
                 </View>
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => Linking.openURL(`https://basescan.org/tx/${p.buyTxHash}`)}
                   style={styles.txLink}
@@ -419,4 +591,19 @@ const styles = StyleSheet.create({
   txLink:       { paddingLeft: 10 },
   txTxt:        { color: '#3b82f6', fontSize: 16 },
   chartWrapper: { marginBottom: 12 },
+  dcaInfoCard: {
+    backgroundColor: '#0c1222',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#1e3a5f',
+  },
+  dcaInfoTitle: { fontSize: 12, fontWeight: '700', color: '#e5e7eb', marginBottom: 6 },
+  dcaInfoSub:   { fontSize: 11, color: '#6b7280', lineHeight: 16, marginBottom: 10 },
+  dcaInfoEm:    { color: '#93c5fd', fontWeight: '600' },
+  dcaInfoLine:  { fontSize: 12, color: '#d1d5db', lineHeight: 20 },
+  dcaInfoDivider: { height: 1, backgroundColor: '#1f2937', marginVertical: 12 },
+  dcaInfoSmallTitle: { fontSize: 11, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  posTapHint:   { fontSize: 10, color: '#6b7280', fontWeight: '400' },
 });

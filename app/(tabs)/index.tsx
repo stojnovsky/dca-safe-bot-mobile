@@ -8,6 +8,7 @@ import { runSimulation } from '@/lib/dca-engine';
 import { getPricesForRange, seedAllPrices, getPriceCoverage } from '@/lib/price-store';
 import { useConfig } from '@/lib/config-store';
 import { HISTORY_START } from '@/lib/constants';
+import { localCalendarDate } from '@/lib/calendar-day';
 import type { SimulationResult, BacktestConfig, CryptoPosition } from '@/lib/types';
 import PortfolioChart, { type ChartPoint } from '@/components/PortfolioChart';
 import StatCard from '@/components/StatCard';
@@ -85,7 +86,7 @@ export default function SimulationScreen() {
   const runSim = useCallback(async (days: number, cfg: BacktestConfig) => {
     setLoading(true);
     try {
-      const today    = new Date().toISOString().slice(0, 10);
+      const today    = localCalendarDate();
       const fromDay  = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
       const fromDate = fromDay < HISTORY_START ? HISTORY_START : fromDay;
 

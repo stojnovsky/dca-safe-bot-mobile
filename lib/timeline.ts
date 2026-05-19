@@ -1,5 +1,6 @@
 import type { CryptoPosition, DailyPrice } from './types';
 import type { ChartPoint } from '@/components/PortfolioChart';
+import { addLocalCalendarDays, localCalendarDate } from './calendar-day';
 
 interface BuildOpts {
   /** ETH price for "today" (from live API) — used when historical map lacks the latest day */
@@ -26,7 +27,7 @@ export function buildPositionTimeline(
 
   const sorted = [...positions].sort((a, b) => a.buyDate.localeCompare(b.buyDate));
   const startDate = sorted[0].buyDate;
-  const endDate = new Date().toISOString().slice(0, 10);
+  const endDate = localCalendarDate();
 
   const ethMap = new Map(ethPrices.map((p) => [p.date, p.price]));
   const btcMap = new Map(btcPrices.map((p) => [p.date, p.price]));
@@ -35,12 +36,9 @@ export function buildPositionTimeline(
   let lastBtc = btcPrices[0]?.price ?? sorted.find((p) => p.asset === 'BTC')?.buyPrice ?? 0;
 
   const points: ChartPoint[] = [];
-  const cur = new Date(startDate);
-  const end = new Date(endDate);
+  let dateStr = startDate;
 
-  while (cur.getTime() <= end.getTime()) {
-    const dateStr = cur.toISOString().slice(0, 10);
-
+  while (dateStr <= endDate) {
     const isToday = dateStr === endDate;
     const ethPrice = ethMap.get(dateStr) ?? (isToday ? opts.liveEthPrice ?? lastEth : lastEth);
     const btcPrice = btcMap.get(dateStr) ?? (isToday ? opts.liveBtcPrice ?? lastBtc : lastBtc);
@@ -69,7 +67,7 @@ export function buildPositionTimeline(
       pnlPercent: invested > 0 ? ((value - invested) / invested) * 100 : 0,
     });
 
-    cur.setDate(cur.getDate() + 1);
+    dateStr = addLocalCalendarDays(dateStr, 1);
   }
 
   return points;
