@@ -125,7 +125,7 @@ export default function DailyCoin({ position, onPress, style, slotWidth }: Props
         </Text>
 
         {/* Open-status indicator (small pulsing-style dot in the corner) */}
-        {isOpen && <View style={[styles.openDot, { backgroundColor: pnlPos ? '#16a34a' : '#dc2626' }]} />}
+        {isOpen && <View style={[styles.openDot, { backgroundColor: pnlPos ? '#48BB78' : '#FC8181' }]} />}
       </View>
 
       <Text style={styles.date}>{position.buyDate.slice(5)}</Text>
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   asset:  { fontSize: 11, fontWeight: '800', marginTop: -2, marginBottom: -2, letterSpacing: 0.2 },
   value:  { fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
   pnl:    { fontSize:  9, fontWeight: '800', fontVariant: ['tabular-nums'], marginTop: 1 },
-  date:   { fontSize: 10, color: '#6b7280', marginTop: 4, fontVariant: ['tabular-nums'] },
+  date:   { fontSize: 10, color: '#718096', marginTop: 4, fontVariant: ['tabular-nums'] },
   openDot: {
     position:     'absolute',
     top:           6,

@@ -33,7 +33,7 @@
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#030712"
+        "backgroundColor": "#0D0D0D"
       }
     },
     "plugins": [

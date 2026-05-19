@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { useConfig } from '@/lib/config-store';
+import { colors } from '@/lib/theme';
 
 export default function TabLayout() {
   const config = useConfig();
@@ -10,9 +11,9 @@ export default function TabLayout() {
       initialRouteName="portfolio"
       screenOptions={{
         headerShown:      false,
-        tabBarStyle:      { backgroundColor: '#0d1117', borderTopColor: '#1f2937' },
-        tabBarActiveTintColor:   '#3b82f6',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarStyle:      { backgroundColor: colors.tabBarBg, borderTopColor: colors.border },
+        tabBarActiveTintColor:   colors.tabActive,
+        tabBarInactiveTintColor: colors.tabInactive,
         tabBarLabelStyle: { fontSize: 11 },
       }}
     >

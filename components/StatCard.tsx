@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { colors } from '@/lib/theme';
 
 interface Props {
   label: string;
@@ -10,7 +11,7 @@ interface Props {
 
 export default function StatCard({ label, value, sub, positive }: Props) {
   const valueColor =
-    positive === undefined ? '#ffffff' : positive ? '#34d399' : '#f87171';
+    positive === undefined ? colors.text : positive ? colors.success : colors.danger;
 
   return (
     <View style={styles.card}>
@@ -23,9 +24,9 @@ export default function StatCard({ label, value, sub, positive }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#111827',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 14,
     flex: 1,
@@ -33,7 +34,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 10,
-    color: '#6b7280',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 6,
@@ -45,7 +46,7 @@ const styles = StyleSheet.create({
   },
   sub: {
     fontSize: 10,
-    color: '#6b7280',
+    color: colors.textSecondary,
     marginTop: 4,
   },
 });

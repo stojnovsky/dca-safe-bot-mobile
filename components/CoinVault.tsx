@@ -13,6 +13,7 @@ import DailyCoin from './DailyCoin';
 import PositionFilterChips from './PositionFilterChips';
 import type { CryptoPosition, PositionLifecycleEvent } from '@/lib/types';
 import { matchesPositionViewFilter, type PositionsViewFilter } from '@/lib/position-filters';
+import { colors } from '@/lib/theme';
 import {
   flattenMonthPositions,
   flattenYearPositions,
@@ -398,19 +399,19 @@ function Legend({ swatch, border, label }: { swatch: string; border: string; lab
 }
 
 const styles = StyleSheet.create({
-  card:         { backgroundColor: '#111827', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#1f2937', marginBottom: 12 },
-  sectionLabel: { fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8 },
+  card:         { backgroundColor: colors.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border, marginBottom: 12 },
+  sectionLabel: { fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8 },
 
   vaultHead:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
-  vaultSub:    { fontSize: 11, color: '#6b7280' },
-  vaultEmpty:  { color: '#4b5563', fontSize: 12, textAlign: 'center', paddingVertical: 20 },
+  vaultSub:    { fontSize: 11, color: colors.textSecondary },
+  vaultEmpty:  { color: colors.textMuted, fontSize: 12, textAlign: 'center', paddingVertical: 20 },
 
   measureBox:  { alignSelf: 'stretch', width: '100%' },
 
   drillBar:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   drillBack:   { paddingVertical: 4, paddingHorizontal: 2 },
-  drillBackTxt:{ fontSize: 14, fontWeight: '700', color: '#93c5fd' },
-  drillCrumb:  { flex: 1, fontSize: 13, fontWeight: '700', color: '#d1d5db' },
+  drillBackTxt:{ fontSize: 14, fontWeight: '700', color: colors.link },
+  drillCrumb:  { flex: 1, fontSize: 13, fontWeight: '700', color: colors.text },
 
   columnsRow:  { flexDirection: 'row', alignItems: 'flex-start', paddingBottom: 4, gap: 0 },
 
@@ -418,44 +419,44 @@ const styles = StyleSheet.create({
     marginRight: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#374151',
-    backgroundColor: '#0f172a',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceInset,
     overflow: 'hidden',
   },
   columnHead: {
     paddingHorizontal: 10,
     paddingVertical: 10,
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surfaceElevated,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: colors.border,
   },
-  columnHeadTappable: { backgroundColor: '#1e3a5f' },
-  columnTitle: { fontSize: 15, fontWeight: '800', color: '#f1f5f9' },
-  columnSub:   { fontSize: 11, color: '#94a3b8', marginTop: 4, fontWeight: '600' },
-  columnTap:   { fontSize: 11, fontWeight: '700', color: '#38bdf8', marginTop: 6 },
+  columnHeadTappable: { backgroundColor: colors.surface, borderColor: colors.primary },
+  columnTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
+  columnSub:   { fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '600' },
+  columnTap:   { fontSize: 11, fontWeight: '700', color: colors.accent, marginTop: 6 },
   columnBody:  { alignItems: 'center' },
 
   columnFooter: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#64748b',
+    color: colors.textSecondary,
     textAlign: 'center',
     paddingVertical: 6,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: colors.border,
   },
 
   coinRow:     { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start' },
 
   weekCoinsScroll: { paddingBottom: 12 },
-  weekCoinsHead:   { fontSize: 17, fontWeight: '800', color: '#f1f5f9', marginBottom: 4 },
-  weekCoinsSub:    { fontSize: 12, fontWeight: '600', color: '#94a3b8', marginBottom: 12 },
+  weekCoinsHead:   { fontSize: 17, fontWeight: '800', color: colors.text, marginBottom: 4 },
+  weekCoinsSub:    { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 12 },
 
-  hintTxt:     { fontSize: 10, color: '#64748b', marginTop: 8, textAlign: 'center', fontWeight: '500' },
+  hintTxt:     { fontSize: 10, color: colors.textSecondary, marginTop: 8, textAlign: 'center', fontWeight: '500' },
 
   legendRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
   legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendSwatch:{ width: 12, height: 12, borderRadius: 6, borderWidth: 1 },
-  legendTxt:   { color: '#9ca3af', fontSize: 10, fontWeight: '500' },
+  legendTxt:   { color: colors.textSecondary, fontSize: 10, fontWeight: '500' },
 
 });

@@ -25,6 +25,7 @@ import {
   type PositionFilterFields,
   type PositionsViewFilter,
 } from '@/lib/position-filters';
+import { colors, refreshColors } from '@/lib/theme';
 
 function fmt(n: number, d = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -358,8 +359,8 @@ export default function PortfolioScreen() {
         <RefreshControl
           refreshing={loading}
           onRefresh={refresh}
-          tintColor="#9ca3af"
-          colors={['#3b82f6', '#60a5fa']}
+          tintColor={colors.textSecondary}
+          colors={[...refreshColors]}
         />
       }
     >
@@ -443,7 +444,7 @@ export default function PortfolioScreen() {
         disabled={running || closingOpenId !== null}
       >
         {running
-          ? <ActivityIndicator color="#fff" size="small" />
+          ? <ActivityIndicator color={colors.primaryOn} size="small" />
           : <Text style={styles.runBtnTxt}>Run DCA Now</Text>
         }
       </TouchableOpacity>
@@ -526,7 +527,7 @@ export default function PortfolioScreen() {
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.posPnl, { color: pnlPos ? '#34d399' : '#f87171' }]}>
+                  <Text style={[styles.posPnl, { color: pnlPos ? colors.success : colors.danger }]}>
                     {pnlPos ? '+' : ''}{fmt(pnlPct)}%
                   </Text>
                   <View style={[styles.statusBadge, p.status === 'OPEN' && styles.statusOpen]}>
@@ -551,59 +552,59 @@ export default function PortfolioScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen:       { flex: 1, backgroundColor: '#030712' },
+  screen:       { flex: 1, backgroundColor: colors.bg },
   content:      { padding: 16, paddingBottom: 40 },
   header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, marginTop: 8 },
-  title:        { fontSize: 20, fontWeight: '700', color: '#fff' },
-  address:      { fontSize: 11, color: '#4b5563', fontVariant: ['tabular-nums'], marginTop: 2 },
-  welcomeCard:  { backgroundColor: '#0b1220', borderColor: '#1f2937', borderWidth: 1, borderRadius: 16, padding: 20, marginTop: 40 },
-  welcomeTitle: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 10 },
-  welcomeBody:  { color: '#9ca3af', fontSize: 14, lineHeight: 21, marginBottom: 18 },
+  title:        { fontSize: 20, fontWeight: '700', color: colors.text },
+  address:      { fontSize: 11, color: colors.textMuted, fontVariant: ['tabular-nums'], marginTop: 2 },
+  welcomeCard:  { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 20, marginTop: 40 },
+  welcomeTitle: { color: colors.text, fontSize: 22, fontWeight: '700', marginBottom: 10 },
+  welcomeBody:  { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: 18 },
   welcomeBullets:{ marginBottom: 22 },
-  bullet:       { color: '#d1d5db', fontSize: 13, lineHeight: 22 },
-  welcomeBtn:   { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 14 },
-  welcomeBtnTxt:{ color: '#fff', fontWeight: '700', fontSize: 15 },
-  welcomeLink:  { color: '#60a5fa', fontSize: 13, textAlign: 'center' },
-  refreshBtn:   { backgroundColor: '#1f2937', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  refreshTxt:   { color: '#9ca3af', fontSize: 12 },
+  bullet:       { color: colors.text, fontSize: 13, lineHeight: 22, opacity: 0.85 },
+  welcomeBtn:   { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 14 },
+  welcomeBtnTxt:{ color: colors.primaryOn, fontWeight: '700', fontSize: 15 },
+  welcomeLink:  { color: colors.link, fontSize: 13, textAlign: 'center' },
+  refreshBtn:   { backgroundColor: colors.surfaceElevated, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  refreshTxt:   { color: colors.textSecondary, fontSize: 12 },
   grid:         { gap: 8, marginBottom: 12 },
   gridRow:      { flexDirection: 'row' },
   gap:          { width: 8 },
-  runBtn:       { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 12 },
-  runBtnDisabled: { backgroundColor: '#1e3a8a' },
-  runBtnTxt:    { color: '#fff', fontWeight: '600', fontSize: 15 },
-  resultBox:    { backgroundColor: '#064e3b', borderRadius: 8, padding: 10, marginBottom: 12 },
-  resultBoxError: { backgroundColor: '#7f1d1d' },
-  resultTxt:    { color: '#d1fae5', fontSize: 12 },
-  card:         { backgroundColor: '#111827', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#1f2937' },
-  sectionLabel: { fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
-  empty:        { color: '#374151', textAlign: 'center', paddingVertical: 20, fontSize: 13 },
-  posRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#1f2937' },
-  posAsset:     { fontSize: 13, fontWeight: '600', color: '#fff' },
-  posDate:      { fontSize: 11, color: '#6b7280', fontWeight: '400' },
-  posMeta:      { fontSize: 11, color: '#6b7280', marginTop: 2 },
+  runBtn:       { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 12 },
+  runBtnDisabled: { backgroundColor: colors.primaryMuted },
+  runBtnTxt:    { color: colors.primaryOn, fontWeight: '600', fontSize: 15 },
+  resultBox:    { backgroundColor: colors.successBg, borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+  resultBoxError: { backgroundColor: colors.dangerBg },
+  resultTxt:    { color: colors.successText, fontSize: 12 },
+  card:         { backgroundColor: colors.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border },
+  sectionLabel: { fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+  empty:        { color: colors.textMuted, textAlign: 'center', paddingVertical: 20, fontSize: 13 },
+  posRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  posAsset:     { fontSize: 13, fontWeight: '600', color: colors.text },
+  posDate:      { fontSize: 11, color: colors.textSecondary, fontWeight: '400' },
+  posMeta:      { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   posPnl:       { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  eth:          { color: '#60a5fa' },
-  btc:          { color: '#fb923c' },
-  statusBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#1f2937', marginTop: 4 },
-  statusOpen:   { backgroundColor: '#1e3a8a' },
-  statusTxt:    { fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' },
+  eth:          { color: colors.eth },
+  btc:          { color: colors.btc },
+  statusBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: colors.surfaceElevated, marginTop: 4 },
+  statusOpen:   { backgroundColor: colors.statusOpenBg, borderWidth: 1, borderColor: colors.accentMuted },
+  statusTxt:    { fontSize: 9, color: colors.textSecondary, textTransform: 'uppercase' },
   txLink:       { paddingLeft: 10 },
-  txTxt:        { color: '#3b82f6', fontSize: 16 },
+  txTxt:        { color: colors.link, fontSize: 16 },
   chartWrapper: { marginBottom: 12 },
   dcaInfoCard: {
-    backgroundColor: '#0c1222',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#1e3a5f',
+    borderColor: colors.border,
   },
-  dcaInfoTitle: { fontSize: 12, fontWeight: '700', color: '#e5e7eb', marginBottom: 6 },
-  dcaInfoSub:   { fontSize: 11, color: '#6b7280', lineHeight: 16, marginBottom: 10 },
-  dcaInfoEm:    { color: '#93c5fd', fontWeight: '600' },
-  dcaInfoLine:  { fontSize: 12, color: '#d1d5db', lineHeight: 20 },
-  dcaInfoDivider: { height: 1, backgroundColor: '#1f2937', marginVertical: 12 },
-  dcaInfoSmallTitle: { fontSize: 11, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  posTapHint:   { fontSize: 10, color: '#6b7280', fontWeight: '400' },
+  dcaInfoTitle: { fontSize: 12, fontWeight: '700', color: colors.text, marginBottom: 6 },
+  dcaInfoSub:   { fontSize: 11, color: colors.textSecondary, lineHeight: 16, marginBottom: 10 },
+  dcaInfoEm:    { color: colors.accent, fontWeight: '600' },
+  dcaInfoLine:  { fontSize: 12, color: colors.text, lineHeight: 20, opacity: 0.9 },
+  dcaInfoDivider: { height: 1, backgroundColor: colors.border, marginVertical: 12 },
+  dcaInfoSmallTitle: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  posTapHint:   { fontSize: 10, color: colors.textSecondary, fontWeight: '400' },
 });

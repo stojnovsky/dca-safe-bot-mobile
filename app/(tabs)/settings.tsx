@@ -18,6 +18,7 @@ import * as BackgroundTask from 'expo-background-task';
 import * as Clipboard from 'expo-clipboard';
 import type { BotConfig } from '@/lib/types';
 import { exportPositionsToJson, importPositionsFromJson } from '@/lib/positions-export';
+import { colors, switchColors } from '@/lib/theme';
 
 function parsePos(v: string, fallback: number): number {
   const n = parseFloat(v);
@@ -58,7 +59,7 @@ function Field({ label, sub, value, onChangeText, secureTextEntry, placeholder, 
         onChangeText={onChangeText}
         secureTextEntry={secureTextEntry}
         placeholder={placeholder}
-        placeholderTextColor="#374151"
+        placeholderTextColor={colors.placeholder}
         autoCapitalize="none"
         autoCorrect={false}
       />
@@ -374,8 +375,8 @@ export default function SettingsScreen() {
           <Switch
             value={config.stopLossEnabled === true}
             onValueChange={(v) => setConfig((c) => ({ ...c, stopLossEnabled: v }))}
-            thumbColor="#3b82f6"
-            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
           />
         </View>
         {config.stopLossEnabled ? (
@@ -412,8 +413,8 @@ export default function SettingsScreen() {
           <Switch
             value={config.reopenEnabled === true}
             onValueChange={(v) => setConfig((c) => ({ ...c, reopenEnabled: v }))}
-            thumbColor="#3b82f6"
-            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
           />
         </View>
         {config.reopenEnabled ? (
@@ -464,12 +465,12 @@ export default function SettingsScreen() {
               iOS schedules at its own discretion (typically every few hours, requires charging + idle).
             </Text>
           </View>
-          <Switch value={botOn} onValueChange={toggleBot} thumbColor="#3b82f6" trackColor={{ true: '#1e3a8a', false: '#374151' }} />
+          <Switch value={botOn} onValueChange={toggleBot} thumbColor={switchColors.thumbColor} trackColor={switchColors.trackColor} />
         </View>
 
         <View style={styles.statusRow}>
           <Text style={styles.statusLabel}>Registered</Text>
-          <Text style={[styles.statusVal, { color: botOn ? '#10b981' : '#6b7280' }]}>
+          <Text style={[styles.statusVal, { color: botOn ? colors.success : colors.textSecondary }]}>
             {botOn ? 'Yes' : 'No'}
           </Text>
         </View>
@@ -477,7 +478,7 @@ export default function SettingsScreen() {
           <Text style={styles.statusLabel}>iOS status</Text>
           <Text style={[
             styles.statusVal,
-            { color: bgStatus === BackgroundTask.BackgroundTaskStatus.Available ? '#10b981' : '#f87171' },
+            { color: bgStatus === BackgroundTask.BackgroundTaskStatus.Available ? colors.success : colors.danger },
           ]}>
             {bgStatusLabel}
           </Text>
@@ -524,7 +525,7 @@ export default function SettingsScreen() {
           value={positionsImportText}
           onChangeText={setPositionsImportText}
           placeholder='{"format":"dca-safe-positions-v1",…}'
-          placeholderTextColor="#4b5563"
+          placeholderTextColor={colors.placeholder}
           multiline
           autoCapitalize="none"
           autoCorrect={false}
@@ -545,7 +546,7 @@ export default function SettingsScreen() {
             onPress={() => runPositionsImport('replace')}
             disabled={positionsBusy}
           >
-            <Text style={[styles.secondaryBtnTxt, { color: '#f87171' }]}>Import (replace all)</Text>
+            <Text style={[styles.secondaryBtnTxt, { color: colors.danger }]}>Import (replace all)</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -567,8 +568,8 @@ export default function SettingsScreen() {
               setConfig((c) => ({ ...c, gamifyPositions: v }));
               try { await saveConfig({ gamifyPositions: v }); } catch { /* will be caught by Save */ }
             }}
-            thumbColor="#3b82f6"
-            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
           />
         </View>
 
@@ -585,8 +586,8 @@ export default function SettingsScreen() {
               setConfig((c) => ({ ...c, showLogsTab: v }));
               try { await saveConfig({ showLogsTab: v }); } catch { /* will be caught by Save */ }
             }}
-            thumbColor="#3b82f6"
-            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
           />
         </View>
       </View>
@@ -600,44 +601,44 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen:        { flex: 1, backgroundColor: '#030712' },
+  screen:        { flex: 1, backgroundColor: colors.bg },
   content:       { padding: 16, paddingBottom: 60 },
-  title:         { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 20, marginTop: 8 },
-  section:       { backgroundColor: '#111827', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#1f2937' },
-  sectionTitle:  { fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12, fontWeight: '600' },
+  title:         { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 20, marginTop: 8 },
+  section:       { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+  sectionTitle:  { fontSize: 12, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12, fontWeight: '600' },
   field:         { marginBottom: 14 },
-  fieldLabel:    { fontSize: 12, color: '#9ca3af', marginBottom: 4 },
-  fieldSub:      { fontSize: 10, color: '#4b5563', marginBottom: 4 },
-  fieldInput:    { backgroundColor: '#1f2937', color: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, borderWidth: 1, borderColor: '#374151' },
+  fieldLabel:    { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
+  fieldSub:      { fontSize: 10, color: colors.textMuted, marginBottom: 4 },
+  fieldInput:    { backgroundColor: colors.inputBg, color: colors.text, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, borderWidth: 1, borderColor: colors.border },
   monoInput:     { fontVariant: ['tabular-nums'], fontSize: 12 },
   row:           { flexDirection: 'row' },
   flexBtn:       { flexGrow: 1, flexBasis: '45%', minWidth: 140 },
-  secondaryBtn:  { backgroundColor: '#1f2937', borderRadius: 8, paddingVertical: 8, alignItems: 'center', marginTop: 4 },
+  secondaryBtn:  { backgroundColor: colors.surfaceElevated, borderRadius: 8, paddingVertical: 8, alignItems: 'center', marginTop: 4, borderWidth: 1, borderColor: colors.border },
   importInput:   {
-    backgroundColor: '#0d1117',
-    color: '#e5e7eb',
+    backgroundColor: colors.surfaceInset,
+    color: colors.text,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 11,
     fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }),
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: colors.border,
     minHeight: 100,
     marginTop: 8,
     textAlignVertical: 'top',
   },
-  secondaryBtnTxt: { color: '#9ca3af', fontSize: 13 },
-  infoBox:       { backgroundColor: '#0d1117', borderRadius: 8, padding: 10, marginTop: 8 },
-  infoTxt:       { color: '#10b981', fontSize: 12, marginBottom: 4 },
-  ownerTxt:      { color: '#6b7280', fontSize: 10, fontVariant: ['tabular-nums'] },
+  secondaryBtnTxt: { color: colors.textSecondary, fontSize: 13 },
+  infoBox:       { backgroundColor: colors.surfaceInset, borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: colors.border },
+  infoTxt:       { color: colors.success, fontSize: 12, marginBottom: 4 },
+  ownerTxt:      { color: colors.textSecondary, fontSize: 10, fontVariant: ['tabular-nums'] },
   toggleRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  toggleLabel:   { color: '#d1d5db', fontSize: 14, fontWeight: '500' },
-  toggleSub:     { color: '#6b7280', fontSize: 11, marginTop: 2 },
+  toggleLabel:   { color: colors.text, fontSize: 14, fontWeight: '500', opacity: 0.9 },
+  toggleSub:     { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
   statusRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4, marginTop: 8 },
-  statusLabel:   { color: '#9ca3af', fontSize: 11 },
+  statusLabel:   { color: colors.textSecondary, fontSize: 11 },
   statusVal:     { fontSize: 11, fontWeight: '600' },
-  saveBtn:       { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  saveBtnSaved:  { backgroundColor: '#065f46' },
-  saveBtnTxt:    { color: '#fff', fontWeight: '700', fontSize: 15 },
+  saveBtn:       { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+  saveBtnSaved:  { backgroundColor: colors.successBg, borderWidth: 1, borderColor: colors.success },
+  saveBtnTxt:    { color: colors.primaryOn, fontWeight: '700', fontSize: 15 },
 });

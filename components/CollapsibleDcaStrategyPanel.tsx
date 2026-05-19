@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { saveConfig } from '@/lib/config-store';
 import type { BotConfig } from '@/lib/types';
+import { colors, switchColors } from '@/lib/theme';
 
 function parsePos(v: string, fallback: number): number {
   const n = parseFloat(v);
@@ -65,7 +66,7 @@ function Field({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#374151"
+        placeholderTextColor={colors.placeholder}
         keyboardType="decimal-pad"
         autoCapitalize="none"
         autoCorrect={false}
@@ -200,8 +201,8 @@ export default function CollapsibleDcaStrategyPanel({ botConfig, onSaved }: Prop
             <Switch
               value={stopLossEnabled}
               onValueChange={setStopLossEnabled}
-              thumbColor="#3b82f6"
-              trackColor={{ true: '#1e3a8a', false: '#374151' }}
+              thumbColor={switchColors.thumbColor}
+              trackColor={switchColors.trackColor}
             />
           </View>
           {stopLossEnabled ? (
@@ -234,8 +235,8 @@ export default function CollapsibleDcaStrategyPanel({ botConfig, onSaved }: Prop
             <Switch
               value={reopenEnabled}
               onValueChange={setReopenEnabled}
-              thumbColor="#3b82f6"
-              trackColor={{ true: '#1e3a8a', false: '#374151' }}
+              thumbColor={switchColors.thumbColor}
+              trackColor={switchColors.trackColor}
             />
           </View>
           {reopenEnabled ? (
@@ -266,7 +267,7 @@ export default function CollapsibleDcaStrategyPanel({ botConfig, onSaved }: Prop
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={colors.primaryOn} size="small" />
             ) : (
               <Text style={styles.saveBtnTxt}>Save strategy</Text>
             )}
@@ -279,10 +280,10 @@ export default function CollapsibleDcaStrategyPanel({ botConfig, onSaved }: Prop
 
 const styles = StyleSheet.create({
   wrap: {
-    backgroundColor: '#111827',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1f2937',
+    borderColor: colors.border,
     marginBottom: 12,
     overflow: 'hidden',
   },
@@ -292,40 +293,40 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 14,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.surfaceElevated,
   },
   barTextCol: { flex: 1, marginRight: 8 },
-  barTitle: { color: '#f3f4f6', fontSize: 14, fontWeight: '700' },
-  barSub:   { color: '#6b7280', fontSize: 11, marginTop: 2 },
-  chevron:  { color: '#9ca3af', fontSize: 14, fontVariant: ['tabular-nums'] },
+  barTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  barSub:   { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+  chevron:  { color: colors.textSecondary, fontSize: 14, fontVariant: ['tabular-nums'] },
   body:     { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 4 },
-  hint:     { color: '#6b7280', fontSize: 11, lineHeight: 16, marginBottom: 10 },
-  groupLabel: { fontSize: 10, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
+  hint:     { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginBottom: 10 },
+  groupLabel: { fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
   row:      { flexDirection: 'row' },
   field:    { marginBottom: 8 },
-  fieldLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 3 },
-  fieldSub:   { fontSize: 9, color: '#4b5563', marginBottom: 3 },
+  fieldLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 3 },
+  fieldSub:   { fontSize: 9, color: colors.textMuted, marginBottom: 3 },
   fieldInput: {
-    backgroundColor: '#1f2937',
-    color: '#fff',
+    backgroundColor: colors.inputBg,
+    color: colors.text,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 14,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: colors.border,
   },
   monoInput: { fontVariant: ['tabular-nums'], fontSize: 13 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  toggleLabel: { color: '#d1d5db', fontSize: 13, fontWeight: '600' },
-  toggleSub:   { color: '#6b7280', fontSize: 10, marginTop: 2, lineHeight: 14 },
+  toggleLabel: { color: colors.text, fontSize: 13, fontWeight: '600', opacity: 0.9 },
+  toggleSub:   { color: colors.textSecondary, fontSize: 10, marginTop: 2, lineHeight: 14 },
   saveBtn: {
     marginTop: 14,
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingVertical: 11,
     alignItems: 'center',
   },
   saveBtnDisabled: { opacity: 0.6 },
-  saveBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  saveBtnTxt: { color: colors.primaryOn, fontWeight: '700', fontSize: 14 },
 });

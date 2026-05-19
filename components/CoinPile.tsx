@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { CryptoPosition } from '@/lib/types';
+import { colors } from '@/lib/theme';
 
 /** Disc colours aligned with `DailyCoin` win/loss + open/closed semantics. */
 function discPalette(p: CryptoPosition): { face: string; rim: string } {
@@ -110,7 +111,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.overlay,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
     shadowRadius: 2,
@@ -130,14 +131,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 10,
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: '#38bdf8',
+    borderColor: colors.accent,
   },
   moreTxt: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#38bdf8',
+    color: colors.accent,
     textAlign: 'center',
   },
   emptyWrap: {
@@ -146,5 +147,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
   },
-  emptyTxt: { fontSize: 12, color: '#64748b', fontWeight: '600' },
+  emptyTxt: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
 });

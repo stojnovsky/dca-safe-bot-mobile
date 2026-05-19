@@ -33,6 +33,7 @@ import {
 } from '@/lib/config-store';
 import { privateKeyToAccount } from 'viem/accounts';
 import { registerDcaTask } from '@/tasks/dca-task';
+import { colors } from '@/lib/theme';
 import { DEFAULT_RPC, ONBOARDING_MIN_ETH_WEI, ONBOARDING_MIN_USDC } from '@/lib/constants';
 
 type Step = 'welcome' | 'backup' | 'fund' | 'deploying' | 'done';
@@ -418,7 +419,7 @@ function FundStep(props: {
       <FundCard
         title="Signer · for gas"
         chip="Base · ETH"
-        chipColor="#3b82f6"
+        chipColor={colors.accent}
         address={signer?.address ?? ''}
         onCopy={(v) => onCopy(v, 'Signer address')}
         balance={`${formatEth(ethBalance)} ETH`}
@@ -431,7 +432,7 @@ function FundStep(props: {
       <FundCard
         title="Safe · DCA capital"
         chip="Base · USDC"
-        chipColor="#22c55e"
+        chipColor={colors.success}
         address={safeAddress ?? ''}
         onCopy={(v) => onCopy(v, 'Safe address')}
         balance={`${formatUsdc(usdcBalance)} USDC`}
@@ -464,7 +465,7 @@ function FundStep(props: {
 function DeployingStep() {
   return (
     <View style={styles.center}>
-      <ActivityIndicator size="large" color="#3b82f6" />
+      <ActivityIndicator size="large" color={colors.primary} />
       <Text style={[styles.h1, { marginTop: 24 }]}>Deploying your Safe…</Text>
       <Text style={styles.p}>
         Submitting createProxyWithNonce on Base. This usually takes 2-5 seconds.
@@ -616,96 +617,97 @@ function SecondaryButton({
 }
 
 const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: '#030712' },
+  screen:         { flex: 1, backgroundColor: colors.bg },
   header:         {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderColor: '#111827',
+    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderColor: colors.border,
   },
-  headerClose:    { color: '#9ca3af', fontSize: 22, width: 24, textAlign: 'center' },
+  headerClose:    { color: colors.textSecondary, fontSize: 22, width: 24, textAlign: 'center' },
   dots:           { flexDirection: 'row', gap: 6 },
-  dot:            { width: 6,  height: 6, borderRadius: 3, backgroundColor: '#1f2937' },
-  dotActive:      { width: 18, backgroundColor: '#3b82f6' },
-  dotDone:        { backgroundColor: '#1e40af' },
+  dot:            { width: 6,  height: 6, borderRadius: 3, backgroundColor: colors.border },
+  dotActive:      { width: 18, backgroundColor: colors.primary },
+  dotDone:        { backgroundColor: colors.primaryMuted },
   content:        { padding: 20, paddingBottom: 60 },
   center:         { alignItems: 'center', paddingTop: 60 },
 
-  h1:             { fontSize: 22, color: '#fff', fontWeight: '700', marginBottom: 10 },
-  p:              { fontSize: 14, color: '#9ca3af', lineHeight: 21, marginBottom: 18 },
-  strong:         { color: '#fff', fontWeight: '600' },
-  label:          { fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 },
-  mono:           { color: '#e5e7eb', fontFamily: 'Menlo', fontSize: 12, lineHeight: 18 },
+  h1:             { fontSize: 22, color: colors.text, fontWeight: '700', marginBottom: 10 },
+  p:              { fontSize: 14, color: colors.textSecondary, lineHeight: 21, marginBottom: 18 },
+  strong:         { color: colors.text, fontWeight: '600' },
+  label:          { fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 },
+  mono:           { color: colors.text, fontFamily: 'Menlo', fontSize: 12, lineHeight: 18, opacity: 0.9 },
 
   card:           {
-    backgroundColor: '#0b1220', borderColor: '#1f2937', borderWidth: 1, borderRadius: 12,
+    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 12,
     padding: 14, marginBottom: 14,
   },
   stepRow:        { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
   stepNumber:     {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: '#1e3a8a',
+    width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primaryMuted,
     alignItems: 'center', justifyContent: 'center', marginRight: 10, marginTop: 1,
   },
-  stepNumberTxt:  { color: '#bfdbfe', fontSize: 12, fontWeight: '700' },
-  stepTitle:      { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 2 },
-  stepBody:       { color: '#9ca3af', fontSize: 13, lineHeight: 19 },
+  stepNumberTxt:  { color: colors.primaryOn, fontSize: 12, fontWeight: '700' },
+  stepTitle:      { color: colors.text, fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  stepBody:       { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
 
-  warning:        { backgroundColor: '#3f1d1d', borderRadius: 10, padding: 12, marginBottom: 16 },
-  warningTxt:     { color: '#fca5a5', fontSize: 13, lineHeight: 19 },
-  hint:           { backgroundColor: '#0b1220', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#1f2937' },
-  hintTxt:        { color: '#6b7280', fontSize: 12, lineHeight: 18 },
-  error:          { backgroundColor: '#7f1d1d', borderRadius: 10, padding: 12, marginBottom: 16 },
-  errorTxt:       { color: '#fee2e2', fontSize: 13 },
+  warning:        { backgroundColor: colors.warningBg, borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.warning },
+  warningTxt:     { color: colors.warning, fontSize: 13, lineHeight: 19 },
+  hint:           { backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
+  hintTxt:        { color: colors.textSecondary, fontSize: 12, lineHeight: 18 },
+  error:          { backgroundColor: colors.dangerBg, borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.danger },
+  errorTxt:       { color: colors.dangerText, fontSize: 13 },
 
   addrBox:        {
-    backgroundColor: '#0b1220', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#1f2937',
+    backgroundColor: colors.surfaceInset, borderRadius: 10, padding: 12,
+    borderWidth: 1, borderColor: colors.border,
     flexDirection: 'row', alignItems: 'center', gap: 10,
   },
-  addrBoxSecret:  { borderColor: '#7f1d1d' },
-  addrLoading:    { color: '#6b7280', fontStyle: 'italic', flex: 1 },
-  copyBtn:        { backgroundColor: '#1f2937', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  copyTxt:        { color: '#93c5fd', fontSize: 11, fontWeight: '600' },
+  addrBoxSecret:  { borderColor: colors.danger },
+  addrLoading:    { color: colors.textSecondary, fontStyle: 'italic', flex: 1 },
+  copyBtn:        { backgroundColor: colors.surfaceElevated, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: colors.border },
+  copyTxt:        { color: colors.link, fontSize: 11, fontWeight: '600' },
 
   ackRow:         { flexDirection: 'row', alignItems: 'flex-start', marginTop: 18, marginBottom: 22 },
   checkbox:       {
-    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#374151',
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.border,
     marginRight: 10, marginTop: 1, alignItems: 'center', justifyContent: 'center',
   },
-  checkboxOn:     { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-  checkboxMark:   { color: '#fff', fontSize: 14, fontWeight: '700' },
-  ackTxt:         { color: '#d1d5db', fontSize: 13, flex: 1, lineHeight: 19 },
+  checkboxOn:     { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkboxMark:   { color: colors.primaryOn, fontSize: 14, fontWeight: '700' },
+  ackTxt:         { color: colors.text, fontSize: 13, flex: 1, lineHeight: 19, opacity: 0.9 },
 
   fundCard:       {
-    backgroundColor: '#0b1220', borderColor: '#1f2937', borderWidth: 1, borderRadius: 12,
+    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 12,
     padding: 14, marginBottom: 14,
   },
   fundHead:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  fundTitle:      { color: '#fff', fontSize: 15, fontWeight: '600' },
-  fundInstr:      { color: '#9ca3af', fontSize: 12, lineHeight: 18, marginBottom: 10 },
+  fundTitle:      { color: colors.text, fontSize: 15, fontWeight: '600' },
+  fundInstr:      { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 10 },
   chip:           { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
   chipTxt:        { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
 
   balanceRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
-  balanceVal:     { color: '#9ca3af', fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  balanceValOk:   { color: '#34d399' },
+  balanceVal:     { color: colors.textSecondary, fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  balanceValOk:   { color: colors.success },
   balanceMeta:    { alignItems: 'flex-end' },
-  balanceThresh:  { color: '#6b7280', fontSize: 11 },
+  balanceThresh:  { color: colors.textSecondary, fontSize: 11 },
   balanceStatus:  { fontSize: 11, marginTop: 2, fontWeight: '600' },
-  balanceStatusOk:      { color: '#34d399' },
-  balanceStatusPending: { color: '#f59e0b' },
+  balanceStatusOk:      { color: colors.success },
+  balanceStatusPending: { color: colors.warning },
 
   row:            { flexDirection: 'row' },
 
-  primaryBtn:     { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 4, flex: 1 },
-  primaryBtnDisabled: { backgroundColor: '#1e3a8a', opacity: 0.6 },
-  primaryBtnTxt:  { color: '#fff', fontWeight: '700', fontSize: 15 },
-  secondaryBtn:   { backgroundColor: '#1f2937', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 4, flex: 1 },
+  primaryBtn:     { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 4, flex: 1 },
+  primaryBtnDisabled: { backgroundColor: colors.primaryMuted, opacity: 0.6 },
+  primaryBtnTxt:  { color: colors.primaryOn, fontWeight: '700', fontSize: 15 },
+  secondaryBtn:   { backgroundColor: colors.surfaceElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 4, flex: 1, borderWidth: 1, borderColor: colors.border },
   secondaryBtnDisabled: { opacity: 0.5 },
-  secondaryBtnTxt:{ color: '#d1d5db', fontWeight: '600', fontSize: 15 },
+  secondaryBtnTxt:{ color: colors.text, fontWeight: '600', fontSize: 15 },
 
   successBadge:   {
     alignSelf: 'center', width: 64, height: 64, borderRadius: 32,
-    backgroundColor: '#064e3b', alignItems: 'center', justifyContent: 'center', marginBottom: 18, marginTop: 12,
+    backgroundColor: colors.successBg, alignItems: 'center', justifyContent: 'center', marginBottom: 18, marginTop: 12,
+    borderWidth: 1, borderColor: colors.success,
   },
-  successBadgeTxt: { color: '#34d399', fontSize: 32, fontWeight: '700' },
-  link:           { color: '#60a5fa', fontSize: 13 },
+  successBadgeTxt: { color: colors.success, fontSize: 32, fontWeight: '700' },
+  link:           { color: colors.link, fontSize: 13 },
 });

@@ -131,7 +131,7 @@ export default function DailyLeaf({ position, onPress, style }: Props) {
         {isOpen && (
           <View
             pointerEvents="none"
-            style={[styles.openDot, { backgroundColor: pnlPos ? '#16a34a' : '#dc2626' }]}
+            style={[styles.openDot, { backgroundColor: pnlPos ? '#48BB78' : '#FC8181' }]}
           />
         )}
       </View>
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0.5 },
     textShadowRadius: 2,
   },
-  date: { fontSize: 10, color: '#6b7280', marginTop: 4, fontVariant: ['tabular-nums'] },
+  date: { fontSize: 10, color: '#718096', marginTop: 4, fontVariant: ['tabular-nums'] },
   openDot: {
     position:    'absolute',
     top:         6,

@@ -15,6 +15,7 @@ import StatCard from '@/components/StatCard';
 import CoinVault from '@/components/CoinVault';
 import PositionFilterChips from '@/components/PositionFilterChips';
 import { matchesPositionViewFilter, type PositionsViewFilter } from '@/lib/position-filters';
+import { colors, switchColors } from '@/lib/theme';
 
 const PERIODS = [
   { label: '90d',  days: 90   },
@@ -201,8 +202,8 @@ export default function SimulationScreen() {
           <Switch
             value={slEn}
             onValueChange={setSlEn}
-            thumbColor="#3b82f6"
-            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
           />
         </View>
         {slEn ? (
@@ -244,8 +245,8 @@ export default function SimulationScreen() {
           <Switch
             value={reopenEn}
             onValueChange={setReopenEn}
-            thumbColor="#3b82f6"
-            trackColor={{ true: '#1e3a8a', false: '#374151' }}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
           />
         </View>
         {reopenEn ? (
@@ -316,7 +317,7 @@ export default function SimulationScreen() {
           disabled={seeding}
         >
           {seeding
-            ? <ActivityIndicator color="#fff" size="small" />
+            ? <ActivityIndicator color={colors.primaryOn} size="small" />
             : <Text style={styles.syncBtnText}>
                 {coverage?.from && coverage.from <= '2022-01-05' ? 'Sync Prices' : 'Sync Jan 2022'}
               </Text>
@@ -378,7 +379,7 @@ export default function SimulationScreen() {
       )}
 
       {loading && !result && (
-        <ActivityIndicator color="#3b82f6" style={styles.spinner} />
+        <ActivityIndicator color={colors.primary} style={styles.spinner} />
       )}
     </ScrollView>
   );
@@ -447,7 +448,7 @@ function PositionsTable({
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[styles.tablePnl, { color: pnlPos ? '#34d399' : '#f87171' }]}>
+              <Text style={[styles.tablePnl, { color: pnlPos ? colors.success : colors.danger }]}>
                 {pnlPos ? '+' : ''}{fmt(pnlPct)}%
               </Text>
               <View style={[styles.tableBadge, isOpen && styles.tableBadgeOpen]}>
@@ -463,51 +464,51 @@ function PositionsTable({
 }
 
 const styles = StyleSheet.create({
-  screen:      { flex: 1, backgroundColor: '#030712' },
+  screen:      { flex: 1, backgroundColor: colors.bg },
   content:     { padding: 16, paddingBottom: 40 },
-  title:       { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 16, marginTop: 8 },
-  card:        { backgroundColor: '#111827', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#1f2937' },
-  sectionLabel:{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
+  title:       { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 16, marginTop: 8 },
+  card:        { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+  sectionLabel:{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
   row:         { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
   inputGroup:  { flex: 1, minWidth: 90 },
-  inputLabel:  { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
+  inputLabel:  { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
   inputRow:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  input:       { backgroundColor: '#1f2937', color: '#fff', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, fontVariant: ['tabular-nums'], width: 70 },
-  unit:        { color: '#6b7280', fontSize: 12 },
-  btn:         { marginTop: 14, backgroundColor: '#2563eb', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
-  btnText:     { color: '#fff', fontWeight: '600', fontSize: 14 },
+  input:       { backgroundColor: colors.inputBg, color: colors.text, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, fontVariant: ['tabular-nums'], width: 70, borderWidth: 1, borderColor: colors.border },
+  unit:        { color: colors.textSecondary, fontSize: 12 },
+  btn:         { marginTop: 14, backgroundColor: colors.primary, borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  btnText:     { color: colors.primaryOn, fontWeight: '600', fontSize: 14 },
   periodRow:   { flexDirection: 'row', marginBottom: 12 },
-  periodBtn:   { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: '#1f2937', marginRight: 6 },
-  periodBtnActive: { backgroundColor: '#2563eb' },
-  periodLabel: { color: '#9ca3af', fontSize: 12, fontWeight: '500' },
-  periodLabelActive: { color: '#fff' },
+  periodBtn:   { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.surfaceElevated, marginRight: 6, borderWidth: 1, borderColor: colors.border },
+  periodBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  periodLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '500' },
+  periodLabelActive: { color: colors.primaryOn, fontWeight: '700' },
   syncRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  coverageText:{ fontSize: 11, color: '#4b5563', flex: 1 },
-  syncBtn:     { backgroundColor: '#374151', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, minWidth: 100, alignItems: 'center' },
-  syncBtnWarn: { backgroundColor: '#92400e' },
-  syncBtnText: { color: '#fff', fontSize: 12, fontWeight: '500' },
+  coverageText:{ fontSize: 11, color: colors.textMuted, flex: 1 },
+  syncBtn:     { backgroundColor: colors.surfaceElevated, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, minWidth: 100, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  syncBtnWarn: { backgroundColor: colors.warningBg, borderColor: colors.warning },
+  syncBtnText: { color: colors.text, fontSize: 12, fontWeight: '500' },
   grid:        { gap: 8, marginBottom: 16 },
   gridRow:     { flexDirection: 'row' },
   gridGap:     { width: 8 },
   chartWrapper:{ marginBottom: 16 },
   spinner:     { marginTop: 40 },
 
-  tableCard:   { backgroundColor: '#111827', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#1f2937', marginBottom: 12 },
+  tableCard:   { backgroundColor: colors.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border, marginBottom: 12 },
   tableHead:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
-  tableEmpty:  { color: '#6b7280', fontSize: 13, paddingVertical: 16, textAlign: 'center' },
-  tableSub:    { fontSize: 11, color: '#6b7280' },
-  tableRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#1f2937' },
-  tableAsset:  { fontSize: 13, fontWeight: '600', color: '#fff' },
-  tableDate:   { fontSize: 11, color: '#6b7280', fontWeight: '400' },
-  tableMeta:   { fontSize: 11, color: '#6b7280', marginTop: 2 },
+  tableEmpty:  { color: colors.textSecondary, fontSize: 13, paddingVertical: 16, textAlign: 'center' },
+  tableSub:    { fontSize: 11, color: colors.textSecondary },
+  tableRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  tableAsset:  { fontSize: 13, fontWeight: '600', color: colors.text },
+  tableDate:   { fontSize: 11, color: colors.textSecondary, fontWeight: '400' },
+  tableMeta:   { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   tablePnl:    { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  tableBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#1f2937', marginTop: 4 },
-  tableBadgeOpen: { backgroundColor: '#1e3a8a' },
-  tableBadgeTxt: { fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' },
-  slRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1f2937' },
-  slLabel:       { fontSize: 13, fontWeight: '600', color: '#e5e7eb' },
-  slSub:         { fontSize: 10, color: '#6b7280', marginTop: 4, lineHeight: 14 },
+  tableBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: colors.surfaceElevated, marginTop: 4 },
+  tableBadgeOpen: { backgroundColor: colors.statusOpenBg },
+  tableBadgeTxt: { fontSize: 9, color: colors.textSecondary, textTransform: 'uppercase' },
+  slRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  slLabel:       { fontSize: 13, fontWeight: '600', color: colors.text },
+  slSub:         { fontSize: 10, color: colors.textSecondary, marginTop: 4, lineHeight: 14 },
   slPctRow:      { marginTop: 10 },
-  eth:         { color: '#60a5fa' },
-  btc:         { color: '#fb923c' },
+  eth:         { color: colors.eth },
+  btc:         { color: colors.btc },
 });

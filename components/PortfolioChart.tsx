@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, GestureResponderEvent } from 'react-native';
 import Svg, { Path, Line, Text as SvgText, Circle, G } from 'react-native-svg';
+import { colors } from '@/lib/theme';
 
 export interface ChartPoint {
   date: string;          // YYYY-MM-DD
@@ -18,16 +19,16 @@ interface Props {
 const PADDING = { top: 16, right: 48, bottom: 56, left: 56 };
 
 const C = {
-  card:           '#0f1729',
-  cardBorder:     '#1f2937',
-  text:           '#9ca3af',
-  textStrong:     '#e5e7eb',
-  grid:           '#1f2937',
-  invested:       '#1e3a8a',
-  investedStroke: '#3b82f6',
-  value:          '#60a5fa',
-  pnl:            '#10b981',
-  cross:          '#94a3b8',
+  card:           colors.surface,
+  cardBorder:     colors.border,
+  text:           colors.textSecondary,
+  textStrong:     colors.text,
+  grid:           colors.border,
+  invested:       colors.surfaceElevated,
+  investedStroke: colors.accentMuted,
+  value:          colors.accent,
+  pnl:            colors.success,
+  cross:          colors.textSecondary,
 };
 
 export default function PortfolioChart({
@@ -218,7 +219,7 @@ export default function PortfolioChart({
                 cy={chart.toYMoney(active.portfolioValue)}
                 r={4}
                 fill={C.value}
-                stroke="#fff"
+                stroke={colors.text}
                 strokeWidth={1.5}
               />
               <Circle
@@ -226,7 +227,7 @@ export default function PortfolioChart({
                 cy={chart.toYPct(active.pnlPercent)}
                 r={3}
                 fill={C.pnl}
-                stroke="#fff"
+                stroke={colors.text}
                 strokeWidth={1.5}
               />
             </G>
@@ -325,7 +326,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   empty:        { padding: 24, alignItems: 'center' },
-  emptyTxt:     { color: '#4b5563', fontSize: 12 },
+  emptyTxt:     { color: colors.textMuted, fontSize: 12 },
 
   legend:       { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 6, gap: 16 },
   legendItem:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -336,15 +337,15 @@ const styles = StyleSheet.create({
 
   tooltip: {
     position: 'absolute',
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 8,
     paddingVertical: 6,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
   },
-  tooltipDate:  { color: '#cbd5e1', fontSize: 11, fontWeight: '600', marginBottom: 4 },
+  tooltipDate:  { color: colors.text, fontSize: 11, fontWeight: '600', marginBottom: 4 },
   tooltipRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 1 },
-  tooltipKey:   { color: '#9ca3af', fontSize: 10 },
-  tooltipVal:   { color: '#fff', fontSize: 10, fontVariant: ['tabular-nums'] },
+  tooltipKey:   { color: colors.textSecondary, fontSize: 10 },
+  tooltipVal:   { color: colors.text, fontSize: 10, fontVariant: ['tabular-nums'] },
 });
