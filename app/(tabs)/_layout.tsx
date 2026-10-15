@@ -4,6 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConfig } from '@/lib/config-store';
 import { colors, fonts } from '@/lib/theme';
 
+export { default as ErrorBoundary } from '@/components/RouteErrorBoundary';
+
 export default function TabLayout() {
   const config = useConfig();
   const showLogs = !!config?.showLogsTab;

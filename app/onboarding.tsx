@@ -37,6 +37,8 @@ import { maybePromptForNotificationPermission } from '@/lib/notifications';
 import { colors, radii } from '@/lib/theme';
 import { DEFAULT_RPC, ONBOARDING_MIN_ETH_WEI, ONBOARDING_MIN_USDC } from '@/lib/constants';
 
+export { default as ErrorBoundary } from '@/components/RouteErrorBoundary';
+
 type Step = 'welcome' | 'backup' | 'fund' | 'deploying' | 'done';
 
 const POLL_INTERVAL_MS = 5_000;

@@ -305,6 +305,26 @@ export default function PortfolioScreen() {
     }
   }, [botBusy]);
 
+  // Per-asset open-position rollup for the AssetRowCards (mockup "Open Positions").
+  // All hooks must stay above the welcome-screen early return below, otherwise
+  // the hook count changes once config loads and React throws.
+  const perAsset = useMemo(() => {
+    const calc = (asset: 'ETH' | 'BTC') => {
+      const rows = openPositions.filter((p) => p.asset === asset);
+      const holdings = rows.reduce((s, p) => s + p.assetAmount, 0);
+      const invested = rows.reduce((s, p) => s + p.usdcInvested, 0);
+      const price    = asset === 'ETH' ? ethPrice : btcPrice;
+      const value    = holdings * price;
+      const pnlUsd   = value - invested;
+      const pnlPct   = invested > 0 ? (pnlUsd / invested) * 100 : 0;
+      const avgPrice = holdings > 0 ? invested / holdings : 0;
+      return { holdings, invested, price, value, pnlUsd, pnlPct, avgPrice };
+    };
+    return { eth: calc('ETH'), btc: calc('BTC') };
+  }, [openPositions, ethPrice, btcPrice]);
+
+  const sparklinePoints = useMemo(() => timeline.map((d) => d.portfolioValue), [timeline]);
+
   // Brand-new install: no Safe configured → show the onboarding pitch in place
   // of the regular portfolio UI. We wait until `config` is loaded so we don't
   // flash the welcome screen for users who already have a Safe.
@@ -377,24 +397,7 @@ export default function PortfolioScreen() {
   const deployedPnlUsd = deployedValue - openCostBasis;
   const deployedPnlPct = openCostBasis > 0 ? (deployedPnlUsd / openCostBasis) * 100 : 0;
 
-  // Per-asset open-position rollup for the AssetRowCards (mockup "Open Positions").
-  const perAsset = useMemo(() => {
-    const calc = (asset: 'ETH' | 'BTC') => {
-      const rows = openPositions.filter((p) => p.asset === asset);
-      const holdings = rows.reduce((s, p) => s + p.assetAmount, 0);
-      const invested = rows.reduce((s, p) => s + p.usdcInvested, 0);
-      const price    = asset === 'ETH' ? ethPrice : btcPrice;
-      const value    = holdings * price;
-      const pnlUsd   = value - invested;
-      const pnlPct   = invested > 0 ? (pnlUsd / invested) * 100 : 0;
-      const avgPrice = holdings > 0 ? invested / holdings : 0;
-      return { holdings, invested, price, value, pnlUsd, pnlPct, avgPrice };
-    };
-    return { eth: calc('ETH'), btc: calc('BTC') };
-  }, [openPositions, ethPrice, btcPrice]);
-
   const heroWidth = Dimensions.get('window').width - 36; // matches content paddingHorizontal
-  const sparklinePoints = useMemo(() => timeline.map((d) => d.portfolioValue), [timeline]);
 
   return (
     <ScrollView

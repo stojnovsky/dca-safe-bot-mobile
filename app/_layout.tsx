@@ -1,6 +1,6 @@
 import 'react-native-get-random-values'; // must be first — polyfills crypto.getRandomValues for viem
 import { Component, useEffect, type ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -38,6 +38,13 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
         <Text style={{ color: colors.textSecondary, marginTop: 8, fontSize: 13 }}>
           {this.state.error.message}
         </Text>
+        <TouchableOpacity
+          onPress={() => this.setState({ error: null })}
+          style={{ alignSelf: 'flex-start', marginTop: 20, paddingVertical: 12 }}
+          accessibilityRole="button"
+        >
+          <Text style={{ color: colors.brand, fontSize: 15, fontWeight: '600' }}>Try again</Text>
+        </TouchableOpacity>
       </View>
     );
   }

@@ -15,8 +15,6 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "fetch",
-          "processing",
-          "fetch",
           "processing"
         ],
         "NSAppTransportSecurity": {
