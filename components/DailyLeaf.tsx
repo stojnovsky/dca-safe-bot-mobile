@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import type { CryptoPosition } from '@/lib/types';
+import { colors } from '@/lib/theme';
 import LeafSvg from '@/assets/leaf.svg';
 
 /** Width matches Daily Coin grid column; height preserves Inkscape aspect ratio (208.57 × 220). */
@@ -131,7 +132,7 @@ export default function DailyLeaf({ position, onPress, style }: Props) {
         {isOpen && (
           <View
             pointerEvents="none"
-            style={[styles.openDot, { backgroundColor: pnlPos ? '#16a34a' : '#dc2626' }]}
+            style={[styles.openDot, { backgroundColor: pnlPos ? colors.success : colors.danger }]}
           />
         )}
       </View>
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0.5 },
     textShadowRadius: 2,
   },
-  date: { fontSize: 10, color: '#6b7280', marginTop: 4, fontVariant: ['tabular-nums'] },
+  date: { fontSize: 10, color: '#718096', marginTop: 4, fontVariant: ['tabular-nums'] },
   openDot: {
     position:    'absolute',
     top:         6,

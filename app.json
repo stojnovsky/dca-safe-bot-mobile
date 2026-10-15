@@ -25,7 +25,8 @@
               "NSExceptionMinimumTLSVersion": "TLSv1.0"
             }
           }
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -33,12 +34,30 @@
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#030712"
-      }
+        "backgroundColor": "#07080D"
+      },
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-background-task",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#D2FF4C",
+          "defaultChannel": "dca-events"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Medit to use Face ID to unlock the app."
+        }
+      ],
       [
         "expo-build-properties",
         {
@@ -52,7 +71,8 @@
             "minSdkVersion": 26
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { colors, fonts, radii } from '@/lib/theme';
 
 interface Props {
   label: string;
@@ -10,42 +11,49 @@ interface Props {
 
 export default function StatCard({ label, value, sub, positive }: Props) {
   const valueColor =
-    positive === undefined ? '#ffffff' : positive ? '#34d399' : '#f87171';
+    positive === undefined ? colors.text : positive ? colors.success : colors.danger;
+  const subColor =
+    positive === undefined ? colors.textMuted : positive ? colors.success : colors.danger;
 
   return (
     <View style={styles.card}>
       <Text style={styles.label}>{label}</Text>
-      <Text style={[styles.value, { color: valueColor }]}>{value}</Text>
-      {sub ? <Text style={styles.sub}>{sub}</Text> : null}
+      <Text style={[styles.value, { color: valueColor }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      {sub ? <Text style={[styles.sub, { color: subColor }]}>{sub}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#111827',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#1f2937',
-    borderRadius: 12,
-    padding: 14,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    padding: 16,
+    paddingHorizontal: 16,
     flex: 1,
     minWidth: 0,
   },
   label: {
-    fontSize: 10,
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 6,
+    fontSize: 11,
+    color: colors.textMuted,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    fontFamily: fonts.sans,
+    marginBottom: 4,
   },
   value: {
-    fontSize: 18,
+    fontSize: 20,
+    letterSpacing: -0.3,
     fontWeight: '700',
+    fontFamily: fonts.monoMedium,
     fontVariant: ['tabular-nums'],
   },
   sub: {
-    fontSize: 10,
-    color: '#6b7280',
-    marginTop: 4,
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: fonts.sans,
+    fontWeight: '500',
   },
 });

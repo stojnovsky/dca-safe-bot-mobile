@@ -1,0 +1,19 @@
+diff --git a/node_modules/react-native-screens/ios/RNSScreen.mm b/node_modules/react-native-screens/ios/RNSScreen.mm
+index 1111111..2222222 100644
+--- a/node_modules/react-native-screens/ios/RNSScreen.mm
++++ b/node_modules/react-native-screens/ios/RNSScreen.mm
+@@ -2223,8 +2223,14 @@ - (void)setViewToSnapshot
+   // if we dismissed the view natively, it will already be detached from view hierarchy
+   if (self.view.window != nil) {
+     auto afterUpdates = self.screenView.snapshotAfterUpdates;
+     UIView *snapshot = [self.view snapshotViewAfterScreenUpdates:afterUpdates];
++    // iOS 26 returns nil here when the screen is removed during the opening
++    // transition, before it has been drawn. Assigning that nil view and passing
++    // it to addSubview: throws and aborts the launch.
++    if (snapshot == nil || superView == nil) {
++      return;
++    }
+     snapshot.frame = self.view.frame;
+     [self.view removeFromSuperview];
+     self.view = snapshot;
+     [superView addSubview:snapshot];

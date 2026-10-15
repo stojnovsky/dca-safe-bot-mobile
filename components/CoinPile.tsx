@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { CryptoPosition } from '@/lib/types';
+import { coinColors, colors } from '@/lib/theme';
 
 /** Disc colours aligned with `DailyCoin` win/loss + open/closed semantics. */
 function discPalette(p: CryptoPosition): { face: string; rim: string } {
@@ -8,13 +9,13 @@ function discPalette(p: CryptoPosition): { face: string; rim: string } {
   const pnl    = isOpen ? (p.unrealizedPnlPct ?? 0) : (p.profitPct ?? 0);
   if (isOpen) {
     return pnl >= 0
-      ? { face: '#bbf7d0', rim: '#166534' }
-      : { face: '#fecaca', rim: '#991b1b' };
+      ? { face: coinColors.liveUp.face, rim: coinColors.liveUp.rim }
+      : { face: coinColors.liveDown.face, rim: coinColors.liveDown.rim };
   }
   if (p.closeReason === 'stop_loss' || pnl < 0) {
-    return { face: '#a16207', rim: '#451a03' };
+    return { face: coinColors.bronze.face, rim: coinColors.bronze.rim };
   }
-  return { face: '#fbbf24', rim: '#78350f' };
+  return { face: coinColors.gold.face, rim: coinColors.gold.rim };
 }
 
 export interface CoinPileProps {
@@ -59,6 +60,10 @@ export default function CoinPile({ positions, width, maxDiscs = 10 }: CoinPilePr
         {sample.map((p, i) => {
           const { face, rim } = discPalette(p);
           const top = i * step;
+          // The bottom-most disc is the only one that's fully visible — every
+          // disc above it has its lower half occluded by the next-higher zIndex
+          // sibling. Brand the fully-visible coin with the Medit "M".
+          const isFront = i === sample.length - 1;
           return (
             <View
               key={p.id}
@@ -79,6 +84,16 @@ export default function CoinPile({ positions, width, maxDiscs = 10 }: CoinPilePr
               ]}
             >
               <View style={[styles.discRim, { borderColor: rim, borderRadius: discD / 2 }]} />
+              {isFront ? (
+                <Text
+                  style={[
+                    styles.discLogo,
+                    { color: rim, fontSize: Math.round(discD * 0.5) },
+                  ]}
+                >
+                  M
+                </Text>
+              ) : null}
             </View>
           );
         })}
@@ -110,7 +125,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.overlay,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
     shadowRadius: 2,
@@ -122,6 +137,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     opacity: 0.35,
   },
+  discLogo: {
+    fontWeight: '900',
+    letterSpacing: -1,
+    opacity: 0.85,
+    includeFontPadding: false,
+    textAlign: 'center',
+    // Optical center: serif/sans glyph baselines sit a hair below true center.
+    marginTop: -2,
+  },
   moreBadge: {
     position: 'absolute',
     right: 4,
@@ -130,14 +154,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 10,
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: '#38bdf8',
+    borderColor: colors.accent,
   },
   moreTxt: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#38bdf8',
+    color: colors.accent,
     textAlign: 'center',
   },
   emptyWrap: {
@@ -146,5 +170,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
   },
-  emptyTxt: { fontSize: 12, color: '#64748b', fontWeight: '600' },
+  emptyTxt: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
 });

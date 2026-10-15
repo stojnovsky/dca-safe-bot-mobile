@@ -6,6 +6,8 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { getBotLogs, clearBotLogs, type BotRunLog } from '@/lib/log-store';
 import type { RunResult } from '@/lib/dca-runner';
+import { colors, radii } from '@/lib/theme';
+import ScreenHeader from '@/components/ScreenHeader';
 
 export default function LogsScreen() {
   const [logs,       setLogs]       = useState<BotRunLog[]>([]);
@@ -56,19 +58,19 @@ export default function LogsScreen() {
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#3b82f6" />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
     >
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Bot Logs</Text>
-          <Text style={styles.sub}>{logs.length} run{logs.length !== 1 ? 's' : ''}</Text>
-        </View>
-        {logs.length > 0 && (
-          <TouchableOpacity style={styles.clearBtn} onPress={onClear}>
-            <Text style={styles.clearTxt}>Clear</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <ScreenHeader
+        title="Logs"
+        subtitle={`${logs.length} run${logs.length !== 1 ? 's' : ''}`}
+        right={
+          logs.length > 0 ? (
+            <TouchableOpacity style={styles.clearBtn} onPress={onClear}>
+              <Text style={styles.clearTxt}>Clear</Text>
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
 
       {logs.length === 0 ? (
         <View style={styles.empty}>
@@ -103,15 +105,15 @@ function LogCard({ log, expanded, onToggle }: { log: BotRunLog; expanded: boolea
         </View>
         <View style={styles.badges}>
           <Badge label={log.source === 'manual' ? 'Manual' : 'Auto'}
-                 color={log.source === 'manual' ? '#3b82f6' : '#8b5cf6'} />
+                 color={log.source === 'manual' ? colors.primary : colors.accent} />
           <Badge label={log.status.toUpperCase()} color={statusColor(log.status)} />
         </View>
       </View>
 
       <View style={styles.metaRow}>
-        {log.buys > 0  && <Stat label="buys"   value={log.buys}   color="#10b981" />}
-        {log.sells > 0 && <Stat label="sells"  value={log.sells}  color="#3b82f6" />}
-        {log.errors > 0 && <Stat label="errors" value={log.errors} color="#f87171" />}
+        {log.buys > 0  && <Stat label="buys"   value={log.buys}   color={colors.success} />}
+        {log.sells > 0 && <Stat label="sells"  value={log.sells}  color={colors.accent} />}
+        {log.errors > 0 && <Stat label="errors" value={log.errors} color={colors.danger} />}
         {log.message && <Text style={styles.msg} numberOfLines={expanded ? undefined : 1}>{log.message}</Text>}
       </View>
 
@@ -194,10 +196,10 @@ function parseDetails(details: string | null): RunResult | null {
 
 function statusColor(status: string): string {
   switch (status) {
-    case 'ok':      return '#10b981';
-    case 'error':   return '#f87171';
-    case 'skipped': return '#6b7280';
-    default:        return '#9ca3af';
+    case 'ok':      return colors.success;
+    case 'error':   return colors.danger;
+    case 'skipped': return colors.textSecondary;
+    default:        return colors.textSecondary;
   }
 }
 
@@ -216,37 +218,34 @@ function fmt(n: number, dp = 2): string {
 }
 
 const styles = StyleSheet.create({
-  screen:       { flex: 1, backgroundColor: '#030712' },
-  content:      { padding: 16, paddingBottom: 40 },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, marginTop: 8 },
-  title:        { fontSize: 20, fontWeight: '700', color: '#fff' },
-  sub:          { fontSize: 11, color: '#4b5563', marginTop: 2 },
-  clearBtn:     { backgroundColor: '#1f2937', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  clearTxt:     { color: '#9ca3af', fontSize: 12 },
+  screen:       { flex: 1, backgroundColor: colors.bg },
+  content:      { paddingHorizontal: 18, paddingBottom: 128, paddingTop: 4 },
+  clearBtn:     { backgroundColor: colors.surfaceElevated, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border },
+  clearTxt:     { color: colors.textSecondary, fontSize: 12 },
 
-  empty:        { backgroundColor: '#0f1729', borderRadius: 12, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#1f2937' },
-  emptyTitle:   { color: '#9ca3af', fontSize: 14, fontWeight: '600', marginBottom: 6 },
-  emptyTxt:     { color: '#4b5563', fontSize: 12, textAlign: 'center', lineHeight: 18 },
+  empty:        { backgroundColor: colors.surface, borderRadius: radii.lg, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  emptyTitle:   { color: colors.textSecondary, fontSize: 14, fontWeight: '600', marginBottom: 6 },
+  emptyTxt:     { color: colors.textMuted, fontSize: 12, textAlign: 'center', lineHeight: 18 },
 
-  card:         { backgroundColor: '#0f1729', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#1f2937' },
+  card:         { backgroundColor: colors.surface, borderRadius: radii.lg, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
   row:          { flexDirection: 'row', alignItems: 'flex-start' },
-  timeTxt:      { color: '#fff', fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  dateTxt:      { color: '#6b7280', fontSize: 11, marginTop: 1 },
+  timeTxt:      { color: colors.text, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  dateTxt:      { color: colors.textSecondary, fontSize: 11, marginTop: 1 },
 
   badges:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  badge:        { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, borderWidth: 1 },
+  badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill, borderWidth: 1 },
   badgeTxt:     { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
 
   metaRow:      { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 14, flexWrap: 'wrap' },
   stat:         { alignItems: 'flex-start' },
   statVal:      { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  statLbl:      { color: '#4b5563', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
-  msg:          { color: '#9ca3af', fontSize: 11, flex: 1, lineHeight: 16 },
+  statLbl:      { color: colors.textMuted, fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 },
+  msg:          { color: colors.textSecondary, fontSize: 11, flex: 1, lineHeight: 16 },
 
-  details:      { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1f2937', gap: 6 },
+  details:      { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, gap: 6 },
   detailRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailPrefix: { color: '#9ca3af', fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  detailValue:  { color: '#e5e7eb', fontSize: 11, flex: 1, fontVariant: ['tabular-nums'] },
-  detailLink:   { color: '#3b82f6', fontSize: 12 },
-  errLine:      { color: '#fca5a5', fontSize: 11, lineHeight: 16, fontVariant: ['tabular-nums'] },
+  detailPrefix: { color: colors.textSecondary, fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  detailValue:  { color: colors.text, fontSize: 11, flex: 1, fontVariant: ['tabular-nums'], opacity: 0.9 },
+  detailLink:   { color: colors.link, fontSize: 12 },
+  errLine:      { color: colors.dangerText, fontSize: 11, lineHeight: 16, fontVariant: ['tabular-nums'] },
 });

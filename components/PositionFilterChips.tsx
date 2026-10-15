@@ -1,32 +1,47 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { POSITION_VIEW_FILTERS, type PositionsViewFilter } from '@/lib/position-filters';
+import { colors, fonts, radii } from '@/lib/theme';
 
 interface Props {
   value: PositionsViewFilter;
-  onChange: (f: PositionsViewFilter) => void;
+  onChange: (v: PositionsViewFilter) => void;
 }
 
 export default function PositionFilterChips({ value, onChange }: Props) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
-      {POSITION_VIEW_FILTERS.map((f) => (
-        <TouchableOpacity
-          key={f.key}
-          onPress={() => onChange(f.key)}
-          style={[styles.chip, value === f.key && styles.chipActive]}
-        >
-          <Text style={[styles.txt, value === f.key && styles.txtActive]}>{f.label}</Text>
-        </TouchableOpacity>
-      ))}
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.row}
+    >
+      {POSITION_VIEW_FILTERS.map((f) => {
+        const active = value === f.key;
+        return (
+          <TouchableOpacity
+            key={f.key}
+            style={[styles.chip, active && styles.chipActive]}
+            onPress={() => onChange(f.key)}
+          >
+            <Text style={[styles.txt, active && styles.txtActive]}>{f.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  row:        { flexGrow: 0, marginBottom: 10 },
-  chip:       { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: '#1f2937', marginRight: 6 },
-  chipActive: { backgroundColor: '#2563eb' },
-  txt:        { fontSize: 12, color: '#9ca3af', fontWeight: '500' },
-  txtActive:  { color: '#fff' },
+  row:        { flexDirection: 'row', paddingVertical: 2, gap: 8 },
+  chip:       {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radii.pill,
+    backgroundColor: colors.chipBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipActive: { backgroundColor: colors.chipActiveBg, borderColor: colors.chipActiveBg },
+  txt:        { fontSize: 12, color: colors.chipText, fontWeight: '600', fontFamily: fonts.sansSemi },
+  txtActive:  { color: colors.chipActiveText, fontWeight: '700' },
 });
