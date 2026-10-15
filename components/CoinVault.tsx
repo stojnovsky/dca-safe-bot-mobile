@@ -13,7 +13,7 @@ import DailyCoin from './DailyCoin';
 import PositionFilterChips from './PositionFilterChips';
 import type { CryptoPosition, PositionLifecycleEvent } from '@/lib/types';
 import { matchesPositionViewFilter, type PositionsViewFilter } from '@/lib/position-filters';
-import { colors } from '@/lib/theme';
+import { coinColors, colors, fonts, radii, type } from '@/lib/theme';
 import {
   flattenMonthPositions,
   flattenYearPositions,
@@ -195,19 +195,18 @@ export default function CoinVault({ positions, onRequestCloseOpen }: Props) {
 
   return (
     <View style={styles.card}>
-      <View style={styles.vaultHead}>
-        <Text style={styles.sectionLabel}>Daily Coins ({positions.length})</Text>
-        <Text style={styles.vaultSub}>
-          {counts.open} open · {counts.closed} closed
-          {onRequestCloseOpen ? ' · live: tap → Close now' : ''}
+      <View style={styles.sectionHeader}>
+        <Text style={type.sectionLabel}>Daily coins</Text>
+        <Text style={styles.shCount}>
+          {positions.length} · {counts.open} open · {counts.closed} closed
         </Text>
       </View>
 
       <View style={styles.legendRow}>
-        <Legend swatch="#fbbf24" border="#78350f" label="Gold · win" />
-        <Legend swatch="#a16207" border="#451a03" label="Bronze · loss / stop-loss" />
-        <Legend swatch="#bbf7d0" border="#166534" label="Live · earning" />
-        <Legend swatch="#fecaca" border="#991b1b" label="Live · down" />
+        <Legend swatch={coinColors.gold.face} border={coinColors.gold.rim} label="Gold · win" />
+        <Legend swatch={coinColors.bronze.face} border={coinColors.bronze.rim} label="Bronze · loss" />
+        <Legend swatch={coinColors.liveUp.face} border={coinColors.liveUp.rim} label="Live · earning" />
+        <Legend swatch={coinColors.liveDown.face} border={coinColors.liveDown.rim} label="Live · down" />
       </View>
 
       <PositionFilterChips value={filter} onChange={setFilter} />
@@ -399,12 +398,11 @@ function Legend({ swatch, border, label }: { swatch: string; border: string; lab
 }
 
 const styles = StyleSheet.create({
-  card:         { backgroundColor: colors.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border, marginBottom: 12 },
-  sectionLabel: { fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8 },
+  card:         { backgroundColor: 'transparent', marginBottom: 12, paddingHorizontal: 0 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingHorizontal: 2 },
+  shCount:      { fontSize: 11, color: colors.primary, fontWeight: '600', fontFamily: fonts.sansSemi },
 
-  vaultHead:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
-  vaultSub:    { fontSize: 11, color: colors.textSecondary },
-  vaultEmpty:  { color: colors.textMuted, fontSize: 12, textAlign: 'center', paddingVertical: 20 },
+  vaultEmpty:  { color: colors.textMuted, fontSize: 12, textAlign: 'center', paddingVertical: 20, fontFamily: fonts.sans },
 
   measureBox:  { alignSelf: 'stretch', width: '100%' },
 
@@ -417,23 +415,24 @@ const styles = StyleSheet.create({
 
   columnShell: {
     marginRight: 10,
-    borderRadius: 10,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceInset,
+    backgroundColor: colors.surface,
     overflow: 'hidden',
+    width: 148,
   },
   columnHead: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  columnHeadTappable: { backgroundColor: colors.surface, borderColor: colors.primary },
-  columnTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
-  columnSub:   { fontSize: 11, color: colors.textSecondary, marginTop: 4, fontWeight: '600' },
-  columnTap:   { fontSize: 11, fontWeight: '700', color: colors.accent, marginTop: 6 },
+  columnHeadTappable: { backgroundColor: colors.surfaceElevated },
+  columnTitle: { fontSize: 13, fontWeight: '700', color: colors.text, fontFamily: fonts.sansBold },
+  columnSub:   { fontSize: 10, color: colors.textMuted, marginTop: 4, fontWeight: '500', fontFamily: fonts.sans },
+  columnTap:   { fontSize: 11, fontWeight: '600', color: colors.link, marginTop: 6, fontFamily: fonts.sansSemi },
   columnBody:  { alignItems: 'center' },
 
   columnFooter: {
@@ -452,11 +451,11 @@ const styles = StyleSheet.create({
   weekCoinsHead:   { fontSize: 17, fontWeight: '800', color: colors.text, marginBottom: 4 },
   weekCoinsSub:    { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: 12 },
 
-  hintTxt:     { fontSize: 10, color: colors.textSecondary, marginTop: 8, textAlign: 'center', fontWeight: '500' },
-
   legendRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
   legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendSwatch:{ width: 12, height: 12, borderRadius: 6, borderWidth: 1 },
-  legendTxt:   { color: colors.textSecondary, fontSize: 10, fontWeight: '500' },
+  legendSwatch:{ width: 10, height: 10, borderRadius: 5, borderWidth: 1.5 },
+  legendTxt:   { color: colors.textDim, fontSize: 11, fontWeight: '500', fontFamily: fonts.sans },
+
+  hintTxt:     { fontSize: 11, color: colors.textHint, marginTop: 8, textAlign: 'center', fontWeight: '500', fontFamily: fonts.sans },
 
 });

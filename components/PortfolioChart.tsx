@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, GestureResponderEvent } from 'react-native';
 import Svg, { Path, Line, Text as SvgText, Circle, G } from 'react-native-svg';
-import { colors } from '@/lib/theme';
+import { colors, radii } from '@/lib/theme';
 
 export interface ChartPoint {
   date: string;          // YYYY-MM-DD
@@ -21,12 +21,12 @@ const PADDING = { top: 16, right: 48, bottom: 56, left: 56 };
 const C = {
   card:           colors.surface,
   cardBorder:     colors.border,
-  text:           colors.textSecondary,
+  text:           colors.textDim,
   textStrong:     colors.text,
-  grid:           colors.border,
+  grid:           colors.chartGrid,
   invested:       colors.surfaceElevated,
-  investedStroke: colors.accentMuted,
-  value:          colors.accent,
+  investedStroke: colors.textMuted,
+  value:          colors.chartLine,
   pnl:            colors.success,
   cross:          colors.textSecondary,
 };
@@ -313,7 +313,7 @@ function formatNumber(n: number): string {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: C.card,
-    borderRadius: 12,
+    borderRadius: radii.lg,
     padding: 12,
     borderWidth: 1,
     borderColor: C.cardBorder,

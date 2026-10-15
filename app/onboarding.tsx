@@ -33,7 +33,8 @@ import {
 } from '@/lib/config-store';
 import { privateKeyToAccount } from 'viem/accounts';
 import { registerDcaTask } from '@/tasks/dca-task';
-import { colors } from '@/lib/theme';
+import { maybePromptForNotificationPermission } from '@/lib/notifications';
+import { colors, radii } from '@/lib/theme';
 import { DEFAULT_RPC, ONBOARDING_MIN_ETH_WEI, ONBOARDING_MIN_USDC } from '@/lib/constants';
 
 type Step = 'welcome' | 'backup' | 'fund' | 'deploying' | 'done';
@@ -272,7 +273,14 @@ export default function OnboardingScreen() {
           <DoneStep
             safeAddress={safeAddress!}
             txHash={deployTx}
-            onFinish={() => router.replace('/(tabs)/portfolio')}
+            onFinish={async () => {
+              // Ask for notification permission once, right as the user
+              // commits to using the app. Best-effort — never blocks the
+              // navigation if the prompt itself fails for any reason.
+              try { await maybePromptForNotificationPermission(); }
+              catch { /* swallow — non-critical */ }
+              router.replace('/');
+            }}
           />
         )}
       </ScrollView>
@@ -637,8 +645,8 @@ const styles = StyleSheet.create({
   mono:           { color: colors.text, fontFamily: 'Menlo', fontSize: 12, lineHeight: 18, opacity: 0.9 },
 
   card:           {
-    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 12,
-    padding: 14, marginBottom: 14,
+    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radii.lg,
+    padding: 16, marginBottom: 14,
   },
   stepRow:        { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
   stepNumber:     {
@@ -649,15 +657,15 @@ const styles = StyleSheet.create({
   stepTitle:      { color: colors.text, fontSize: 14, fontWeight: '600', marginBottom: 2 },
   stepBody:       { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
 
-  warning:        { backgroundColor: colors.warningBg, borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.warning },
+  warning:        { backgroundColor: colors.warningBg, borderRadius: radii.sm, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.warning },
   warningTxt:     { color: colors.warning, fontSize: 13, lineHeight: 19 },
-  hint:           { backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
+  hint:           { backgroundColor: colors.surface, borderRadius: radii.sm, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   hintTxt:        { color: colors.textSecondary, fontSize: 12, lineHeight: 18 },
-  error:          { backgroundColor: colors.dangerBg, borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.danger },
+  error:          { backgroundColor: colors.dangerBg, borderRadius: radii.sm, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.dangerBorder },
   errorTxt:       { color: colors.dangerText, fontSize: 13 },
 
   addrBox:        {
-    backgroundColor: colors.surfaceInset, borderRadius: 10, padding: 12,
+    backgroundColor: colors.surfaceInset, borderRadius: radii.sm, padding: 12,
     borderWidth: 1, borderColor: colors.border,
     flexDirection: 'row', alignItems: 'center', gap: 10,
   },
@@ -676,8 +684,8 @@ const styles = StyleSheet.create({
   ackTxt:         { color: colors.text, fontSize: 13, flex: 1, lineHeight: 19, opacity: 0.9 },
 
   fundCard:       {
-    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 12,
-    padding: 14, marginBottom: 14,
+    backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radii.lg,
+    padding: 16, marginBottom: 14,
   },
   fundHead:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   fundTitle:      { color: colors.text, fontSize: 15, fontWeight: '600' },
@@ -696,10 +704,10 @@ const styles = StyleSheet.create({
 
   row:            { flexDirection: 'row' },
 
-  primaryBtn:     { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 4, flex: 1 },
+  primaryBtn:     { backgroundColor: colors.primary, borderRadius: radii.button, paddingVertical: 16, alignItems: 'center', marginTop: 4, flex: 1 },
   primaryBtnDisabled: { backgroundColor: colors.primaryMuted, opacity: 0.6 },
   primaryBtnTxt:  { color: colors.primaryOn, fontWeight: '700', fontSize: 15 },
-  secondaryBtn:   { backgroundColor: colors.surfaceElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 4, flex: 1, borderWidth: 1, borderColor: colors.border },
+  secondaryBtn:   { backgroundColor: colors.surfaceElevated, borderRadius: radii.button, paddingVertical: 16, alignItems: 'center', marginTop: 4, flex: 1, borderWidth: 1, borderColor: colors.border },
   secondaryBtnDisabled: { opacity: 0.5 },
   secondaryBtnTxt:{ color: colors.text, fontWeight: '600', fontSize: 15 },
 

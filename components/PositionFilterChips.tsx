@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { POSITION_VIEW_FILTERS, type PositionsViewFilter } from '@/lib/position-filters';
-import { colors } from '@/lib/theme';
+import { colors, fonts, radii } from '@/lib/theme';
 
 interface Props {
   value: PositionsViewFilter;
@@ -10,7 +10,11 @@ interface Props {
 
 export default function PositionFilterChips({ value, onChange }: Props) {
   return (
-    <View style={styles.row}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.row}
+    >
       {POSITION_VIEW_FILTERS.map((f) => {
         const active = value === f.key;
         return (
@@ -23,14 +27,21 @@ export default function PositionFilterChips({ value, onChange }: Props) {
           </TouchableOpacity>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  row:        { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
-  chip:       { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: colors.chipBg, marginRight: 6, borderWidth: 1, borderColor: colors.border },
-  chipActive: { backgroundColor: colors.chipActiveBg, borderColor: colors.primary },
-  txt:        { fontSize: 12, color: colors.chipText, fontWeight: '500' },
+  row:        { flexDirection: 'row', paddingVertical: 2, gap: 8 },
+  chip:       {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radii.pill,
+    backgroundColor: colors.chipBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipActive: { backgroundColor: colors.chipActiveBg, borderColor: colors.chipActiveBg },
+  txt:        { fontSize: 12, color: colors.chipText, fontWeight: '600', fontFamily: fonts.sansSemi },
   txtActive:  { color: colors.chipActiveText, fontWeight: '700' },
 });

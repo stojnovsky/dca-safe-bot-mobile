@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { saveConfig } from '@/lib/config-store';
 import type { BotConfig } from '@/lib/types';
-import { colors, switchColors } from '@/lib/theme';
+import { colors, fonts, radii, switchColors } from '@/lib/theme';
 
 function parsePos(v: string, fallback: number): number {
   const n = parseFloat(v);
@@ -281,7 +281,7 @@ export default function CollapsibleDcaStrategyPanel({ botConfig, onSaved }: Prop
 const styles = StyleSheet.create({
   wrap: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 12,
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   fieldInput: {
     backgroundColor: colors.inputBg,
     color: colors.text,
-    borderRadius: 8,
+    borderRadius: radii.sm,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 14,
@@ -323,8 +323,8 @@ const styles = StyleSheet.create({
   saveBtn: {
     marginTop: 14,
     backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 11,
+    borderRadius: radii.button,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   saveBtnDisabled: { opacity: 0.6 },

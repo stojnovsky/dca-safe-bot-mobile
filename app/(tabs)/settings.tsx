@@ -18,7 +18,24 @@ import * as BackgroundTask from 'expo-background-task';
 import * as Clipboard from 'expo-clipboard';
 import type { BotConfig } from '@/lib/types';
 import { exportPositionsToJson, importPositionsFromJson } from '@/lib/positions-export';
-import { colors, switchColors } from '@/lib/theme';
+import {
+  useNotificationsState,
+  setNotificationsEnabled,
+  requestNotificationPermission,
+  openSystemSettings,
+} from '@/lib/notifications';
+import {
+  useAppLockPrefs,
+  setBiometricEnabled,
+  getBiometricAvailability,
+  getBiometricLabel,
+  biometricUnavailableMessage,
+  authenticateWithBiometrics,
+  disableAppLock,
+} from '@/lib/app-lock';
+import { colors, fonts, radii, switchColors } from '@/lib/theme';
+import ScreenHeader from '@/components/ScreenHeader';
+import AppLockPinModal, { type PinFlowMode } from '@/components/AppLockPinModal';
 
 function parsePos(v: string, fallback: number): number {
   const n = parseFloat(v);
@@ -103,6 +120,101 @@ export default function SettingsScreen() {
   const [safeInfo, setSafeInfo] = useState<{ owners: string[]; threshold: number } | null>(null);
   const [positionsImportText, setPositionsImportText] = useState('');
   const [positionsBusy, setPositionsBusy] = useState(false);
+  const notif = useNotificationsState();
+  const appLock = useAppLockPrefs();
+  const [pinModal, setPinModal] = useState<{ visible: boolean; mode: PinFlowMode }>({
+    visible: false,
+    mode: 'setup',
+  });
+  const [bioLabel, setBioLabel] = useState('Biometrics');
+
+  useFocusEffect(useCallback(() => {
+    getBiometricLabel().then(setBioLabel).catch(() => undefined);
+  }, []));
+
+  const onToggleNotifications = async (on: boolean) => {
+    if (!on) {
+      await setNotificationsEnabled(false);
+      return;
+    }
+    // Turning ON — must have OS permission. Ask if undetermined, otherwise
+    // surface a clear path to the system Settings page.
+    const status = await requestNotificationPermission();
+    if (status === 'granted') {
+      await setNotificationsEnabled(true);
+    } else {
+      Alert.alert(
+        'Notifications disabled in iOS Settings',
+        'To get push notifications when your DCA bot trades, enable notifications for Medit in iOS Settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => { openSystemSettings().catch(() => undefined); } },
+        ],
+      );
+    }
+    await notif.refresh();
+  };
+
+  const openPinModal = (mode: PinFlowMode) => setPinModal({ visible: true, mode });
+
+  const onToggleAppLock = (on: boolean) => {
+    if (on) {
+      openPinModal('setup');
+      return;
+    }
+    Alert.alert(
+      'Turn off App Lock?',
+      'You will need your passcode (or biometrics) to confirm.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: () => {
+            if (appLock.biometric) {
+              (async () => {
+                const ok = await disableAppLock('biometric');
+                if (ok) {
+                  await appLock.refresh();
+                  return;
+                }
+                openPinModal('confirmDisable');
+              })().catch(() => openPinModal('confirmDisable'));
+            } else {
+              openPinModal('confirmDisable');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const onToggleBiometric = async (on: boolean) => {
+    if (!on) {
+      await setBiometricEnabled(false);
+      await appLock.refresh();
+      return;
+    }
+    const availability = await getBiometricAvailability();
+    if (availability !== 'available') {
+      Alert.alert(
+        `${bioLabel} unavailable`,
+        biometricUnavailableMessage(availability),
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => { openSystemSettings().catch(() => undefined); } },
+        ],
+      );
+      return;
+    }
+    const ok = await authenticateWithBiometrics(`Enable ${bioLabel} unlock`);
+    if (!ok) return;
+    try {
+      await setBiometricEnabled(true);
+      await appLock.refresh();
+    } catch (e) {
+      Alert.alert('Could not enable', e instanceof Error ? e.message : 'Unknown error');
+    }
+  };
 
   useFocusEffect(useCallback(() => {
     (async () => {
@@ -307,8 +419,164 @@ export default function SettingsScreen() {
     bgStatus === null                                           ? '…'          : 'Unknown';
 
   return (
+    <>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>Settings</Text>
+      <ScreenHeader title="Settings" />
+
+      {/* App lock / biometrics */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Security</Text>
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>App Lock</Text>
+            <Text style={styles.toggleSub}>
+              Require a 6-digit passcode when opening Medit. Background DCA keeps running.
+            </Text>
+          </View>
+          <Switch
+            value={appLock.enabled && appLock.hasPin}
+            onValueChange={onToggleAppLock}
+            disabled={appLock.loading}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
+          />
+        </View>
+
+        {appLock.enabled && appLock.hasPin ? (
+          <>
+            <View style={[styles.toggleRow, { marginTop: 14 }]}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.toggleLabel}>Unlock with {bioLabel}</Text>
+                <Text style={styles.toggleSub}>
+                  Use {bioLabel} instead of typing your passcode. Passcode remains as a fallback.
+                </Text>
+              </View>
+              <Switch
+                value={appLock.biometric}
+                onValueChange={onToggleBiometric}
+                thumbColor={switchColors.thumbColor}
+                trackColor={switchColors.trackColor}
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { marginTop: 12 }]}
+              onPress={() => openPinModal('change')}
+            >
+              <Text style={styles.secondaryBtnTxt}>Change passcode</Text>
+            </TouchableOpacity>
+          </>
+        ) : null}
+      </View>
+
+      {/* Push notifications */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Push notifications</Text>
+            <Text style={styles.toggleSub}>
+              Get notified when the bot buys, takes profit, or fails. Quiet
+              "already bought today" runs stay silent.
+            </Text>
+          </View>
+          <Switch
+            value={notif.enabled && notif.permission === 'granted'}
+            onValueChange={onToggleNotifications}
+            disabled={notif.loading}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
+          />
+        </View>
+        {notif.permission === 'denied' && (
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { marginTop: 10 }]}
+            onPress={() => { openSystemSettings().catch(() => undefined); }}
+          >
+            <Text style={styles.secondaryBtnTxt}>Notifications blocked — Open iOS Settings</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Display preferences */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Display</Text>
+
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Gamify positions</Text>
+            <Text style={styles.toggleSub}>
+              Show positions as Daily Coins (gold = closed in profit, bronze = closed in loss, live = open). Turn off for a plain table.
+            </Text>
+          </View>
+          <Switch
+            value={config.gamifyPositions !== false}
+            onValueChange={async (v) => {
+              setConfig((c) => ({ ...c, gamifyPositions: v }));
+              try { await saveConfig({ gamifyPositions: v }); } catch { /* will be caught by Save */ }
+            }}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
+          />
+        </View>
+
+        <View style={[styles.toggleRow, { marginTop: 14 }]}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Show Logs tab</Text>
+            <Text style={styles.toggleSub}>
+              Developer-oriented log of every bot run (manual + background). Off by default.
+            </Text>
+          </View>
+          <Switch
+            value={!!config.showLogsTab}
+            onValueChange={async (v) => {
+              setConfig((c) => ({ ...c, showLogsTab: v }));
+              try { await saveConfig({ showLogsTab: v }); } catch { /* will be caught by Save */ }
+            }}
+            thumbColor={switchColors.thumbColor}
+            trackColor={switchColors.trackColor}
+          />
+        </View>
+      </View>
+
+      {/* Background bot toggle */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Background Bot</Text>
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.toggleLabel}>Hourly background check</Text>
+            <Text style={styles.toggleSub}>
+              iOS schedules at its own discretion (typically every few hours, requires charging + idle).
+            </Text>
+          </View>
+          <Switch value={botOn} onValueChange={toggleBot} thumbColor={switchColors.thumbColor} trackColor={switchColors.trackColor} />
+        </View>
+
+        <View style={styles.statusRow}>
+          <Text style={styles.statusLabel}>Registered</Text>
+          <Text style={[styles.statusVal, { color: botOn ? colors.success : colors.textSecondary }]}>
+            {botOn ? 'Yes' : 'No'}
+          </Text>
+        </View>
+        <View style={styles.statusRow}>
+          <Text style={styles.statusLabel}>iOS status</Text>
+          <Text style={[
+            styles.statusVal,
+            { color: bgStatus === BackgroundTask.BackgroundTaskStatus.Available ? colors.success : colors.danger },
+          ]}>
+            {bgStatusLabel}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.secondaryBtn, { marginTop: 10 }]}
+          onPress={runNow}
+          disabled={triggering}
+        >
+          <Text style={styles.secondaryBtnTxt}>
+            {triggering ? 'Triggering…' : 'Run Background Task Now (debug)'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Safe wallet */}
       <View style={styles.section}>
@@ -442,59 +710,6 @@ export default function SettingsScreen() {
         ) : null}
       </View>
 
-      {/* Prices API */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Prices API (Historical)</Text>
-        <Field
-          label="Base URL"
-          sub="medit/prices-api backend serving BTC/ETH historical prices"
-          placeholder={DEFAULT_PRICES_API_URL}
-          value={config.pricesApiUrl}
-          onChangeText={(v) => setConfig((c) => ({ ...c, pricesApiUrl: v }))}
-          mono
-        />
-      </View>
-
-      {/* Background bot toggle */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Background Bot</Text>
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={styles.toggleLabel}>Hourly background check</Text>
-            <Text style={styles.toggleSub}>
-              iOS schedules at its own discretion (typically every few hours, requires charging + idle).
-            </Text>
-          </View>
-          <Switch value={botOn} onValueChange={toggleBot} thumbColor={switchColors.thumbColor} trackColor={switchColors.trackColor} />
-        </View>
-
-        <View style={styles.statusRow}>
-          <Text style={styles.statusLabel}>Registered</Text>
-          <Text style={[styles.statusVal, { color: botOn ? colors.success : colors.textSecondary }]}>
-            {botOn ? 'Yes' : 'No'}
-          </Text>
-        </View>
-        <View style={styles.statusRow}>
-          <Text style={styles.statusLabel}>iOS status</Text>
-          <Text style={[
-            styles.statusVal,
-            { color: bgStatus === BackgroundTask.BackgroundTaskStatus.Available ? colors.success : colors.danger },
-          ]}>
-            {bgStatusLabel}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.secondaryBtn, { marginTop: 10 }]}
-          onPress={runNow}
-          disabled={triggering}
-        >
-          <Text style={styles.secondaryBtnTxt}>
-            {triggering ? 'Triggering…' : 'Run Background Task Now (debug)'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Positions backup (migrate to another device) */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Positions backup</Text>
@@ -551,73 +766,54 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Display preferences */}
+      {/* Prices API */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Display</Text>
-
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={styles.toggleLabel}>Gamify positions</Text>
-            <Text style={styles.toggleSub}>
-              Show positions as Daily Coins (gold = closed in profit, bronze = closed in loss, live = open). Turn off for a plain table.
-            </Text>
-          </View>
-          <Switch
-            value={config.gamifyPositions !== false}
-            onValueChange={async (v) => {
-              setConfig((c) => ({ ...c, gamifyPositions: v }));
-              try { await saveConfig({ gamifyPositions: v }); } catch { /* will be caught by Save */ }
-            }}
-            thumbColor={switchColors.thumbColor}
-            trackColor={switchColors.trackColor}
-          />
-        </View>
-
-        <View style={[styles.toggleRow, { marginTop: 14 }]}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={styles.toggleLabel}>Show Logs tab</Text>
-            <Text style={styles.toggleSub}>
-              Developer-oriented log of every bot run (manual + background). Off by default.
-            </Text>
-          </View>
-          <Switch
-            value={!!config.showLogsTab}
-            onValueChange={async (v) => {
-              setConfig((c) => ({ ...c, showLogsTab: v }));
-              try { await saveConfig({ showLogsTab: v }); } catch { /* will be caught by Save */ }
-            }}
-            thumbColor={switchColors.thumbColor}
-            trackColor={switchColors.trackColor}
-          />
-        </View>
+        <Text style={styles.sectionTitle}>Prices API</Text>
+        <Field
+          label="Base URL"
+          sub="medit/prices-api backend serving BTC/ETH historical prices"
+          placeholder={DEFAULT_PRICES_API_URL}
+          value={config.pricesApiUrl}
+          onChangeText={(v) => setConfig((c) => ({ ...c, pricesApiUrl: v }))}
+          mono
+        />
       </View>
 
-      {/* Save */}
       <TouchableOpacity style={[styles.saveBtn, saved && styles.saveBtnSaved]} onPress={save}>
         <Text style={styles.saveBtnTxt}>{saved ? '✓ Saved' : 'Save Settings'}</Text>
       </TouchableOpacity>
     </ScrollView>
+
+    <AppLockPinModal
+      visible={pinModal.visible}
+      mode={pinModal.mode}
+      onClose={() => setPinModal((m) => ({ ...m, visible: false }))}
+      onSuccess={async () => {
+        setPinModal((m) => ({ ...m, visible: false }));
+        await appLock.refresh();
+      }}
+    />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   screen:        { flex: 1, backgroundColor: colors.bg },
-  content:       { padding: 16, paddingBottom: 60 },
-  title:         { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 20, marginTop: 8 },
-  section:       { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
-  sectionTitle:  { fontSize: 12, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12, fontWeight: '600' },
+  content:       { paddingHorizontal: 18, paddingBottom: 128, paddingTop: 4 },
+  section:       { backgroundColor: colors.surface, borderRadius: radii.lg, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+  sectionTitle:  { fontSize: 15, color: colors.text, letterSpacing: -0.2, marginBottom: 14, fontWeight: '700', fontFamily: fonts.sansBold },
   field:         { marginBottom: 14 },
   fieldLabel:    { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
   fieldSub:      { fontSize: 10, color: colors.textMuted, marginBottom: 4 },
-  fieldInput:    { backgroundColor: colors.inputBg, color: colors.text, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, borderWidth: 1, borderColor: colors.border },
+  fieldInput:    { backgroundColor: colors.inputBg, color: colors.text, borderRadius: radii.sm, paddingHorizontal: 12, paddingVertical: 12, fontSize: 14, borderWidth: 1, borderColor: colors.border },
   monoInput:     { fontVariant: ['tabular-nums'], fontSize: 12 },
   row:           { flexDirection: 'row' },
   flexBtn:       { flexGrow: 1, flexBasis: '45%', minWidth: 140 },
-  secondaryBtn:  { backgroundColor: colors.surfaceElevated, borderRadius: 8, paddingVertical: 8, alignItems: 'center', marginTop: 4, borderWidth: 1, borderColor: colors.border },
+  secondaryBtn:  { backgroundColor: colors.surfaceElevated, borderRadius: radii.button, paddingVertical: 12, alignItems: 'center', marginTop: 4, borderWidth: 1, borderColor: colors.border },
   importInput:   {
     backgroundColor: colors.surfaceInset,
     color: colors.text,
-    borderRadius: 8,
+    borderRadius: radii.sm,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 11,
@@ -629,7 +825,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   secondaryBtnTxt: { color: colors.textSecondary, fontSize: 13 },
-  infoBox:       { backgroundColor: colors.surfaceInset, borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: colors.border },
+  infoBox:       { backgroundColor: colors.surfaceInset, borderRadius: radii.sm, padding: 12, marginTop: 8, borderWidth: 1, borderColor: colors.border },
   infoTxt:       { color: colors.success, fontSize: 12, marginBottom: 4 },
   ownerTxt:      { color: colors.textSecondary, fontSize: 10, fontVariant: ['tabular-nums'] },
   toggleRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -638,7 +834,8 @@ const styles = StyleSheet.create({
   statusRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4, marginTop: 8 },
   statusLabel:   { color: colors.textSecondary, fontSize: 11 },
   statusVal:     { fontSize: 11, fontWeight: '600' },
-  saveBtn:       { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+  saveBtn:       { backgroundColor: colors.primary, borderRadius: radii.button, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   saveBtnSaved:  { backgroundColor: colors.successBg, borderWidth: 1, borderColor: colors.success },
   saveBtnTxt:    { color: colors.primaryOn, fontWeight: '700', fontSize: 15 },
 });
+

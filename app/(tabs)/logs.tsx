@@ -6,7 +6,8 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { getBotLogs, clearBotLogs, type BotRunLog } from '@/lib/log-store';
 import type { RunResult } from '@/lib/dca-runner';
-import { colors } from '@/lib/theme';
+import { colors, radii } from '@/lib/theme';
+import ScreenHeader from '@/components/ScreenHeader';
 
 export default function LogsScreen() {
   const [logs,       setLogs]       = useState<BotRunLog[]>([]);
@@ -59,17 +60,17 @@ export default function LogsScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}
     >
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Bot Logs</Text>
-          <Text style={styles.sub}>{logs.length} run{logs.length !== 1 ? 's' : ''}</Text>
-        </View>
-        {logs.length > 0 && (
-          <TouchableOpacity style={styles.clearBtn} onPress={onClear}>
-            <Text style={styles.clearTxt}>Clear</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <ScreenHeader
+        title="Logs"
+        subtitle={`${logs.length} run${logs.length !== 1 ? 's' : ''}`}
+        right={
+          logs.length > 0 ? (
+            <TouchableOpacity style={styles.clearBtn} onPress={onClear}>
+              <Text style={styles.clearTxt}>Clear</Text>
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
 
       {logs.length === 0 ? (
         <View style={styles.empty}>
@@ -218,24 +219,21 @@ function fmt(n: number, dp = 2): string {
 
 const styles = StyleSheet.create({
   screen:       { flex: 1, backgroundColor: colors.bg },
-  content:      { padding: 16, paddingBottom: 40 },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, marginTop: 8 },
-  title:        { fontSize: 20, fontWeight: '700', color: colors.text },
-  sub:          { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  clearBtn:     { backgroundColor: colors.surfaceElevated, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  content:      { paddingHorizontal: 18, paddingBottom: 128, paddingTop: 4 },
+  clearBtn:     { backgroundColor: colors.surfaceElevated, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.border },
   clearTxt:     { color: colors.textSecondary, fontSize: 12 },
 
-  empty:        { backgroundColor: colors.surface, borderRadius: 12, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  empty:        { backgroundColor: colors.surface, borderRadius: radii.lg, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   emptyTitle:   { color: colors.textSecondary, fontSize: 14, fontWeight: '600', marginBottom: 6 },
   emptyTxt:     { color: colors.textMuted, fontSize: 12, textAlign: 'center', lineHeight: 18 },
 
-  card:         { backgroundColor: colors.surface, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
+  card:         { backgroundColor: colors.surface, borderRadius: radii.lg, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
   row:          { flexDirection: 'row', alignItems: 'flex-start' },
   timeTxt:      { color: colors.text, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
   dateTxt:      { color: colors.textSecondary, fontSize: 11, marginTop: 1 },
 
   badges:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  badge:        { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, borderWidth: 1 },
+  badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill, borderWidth: 1 },
   badgeTxt:     { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
 
   metaRow:      { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 14, flexWrap: 'wrap' },
